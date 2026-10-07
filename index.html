@@ -176,6 +176,7 @@ button{font:inherit;color:inherit}
 .stepper output{min-width:3ch;text-align:center;font-family:var(--font-display);font-size:24px;font-variant-numeric:tabular-nums}
 .sheet-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
 .danger-text{color:var(--danger)}
+.version{margin:2px 0 0;text-align:center;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;-webkit-user-select:text;user-select:text}
 
 @media (prefers-reduced-motion: reduce){
   .arrow.hinted{animation:none}
@@ -300,6 +301,7 @@ button{font:inherit;color:inherit}
       <button class="btn primary" id="playLvBtn" type="button">Play level 1</button>
     </div>
     <button class="btn quiet" id="closeSheet" type="button">Close</button>
+    <p class="version" id="versionText"></p>
   </div>
 </div>
 
@@ -667,7 +669,15 @@ function generateFrom(p, seedBase) {
 
 <script>
 (() => {
+  // Bump with every release so the installed app shows which version it is running
+  const APP_VERSION = '1.1.0';
+  const APP_BUILD = '2026-10-07';
   const $ = (s) => document.querySelector(s);
+  {
+    const [y, m, d] = APP_BUILD.split('-').map(Number);
+    const built = new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    $('#versionText').textContent = `Slipway ${APP_VERSION} · ${built}`;
+  }
   const NS = 'http://www.w3.org/2000/svg';
   const STROKE = 0.2;
   const HEAD = 'M0.42 0 L-0.06 -0.27 L-0.06 0.27 Z';
