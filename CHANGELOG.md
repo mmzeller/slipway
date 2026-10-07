@@ -2,6 +2,9 @@
 
 The version shows at the bottom of the Settings screen in the app.
 
+## 1.3.1 · Oct 7, 2026
+- Fit board moved next to the timer, so it no longer covers arrows
+
 ## 1.3.0 · Oct 7, 2026
 - Pinch and drag on the board work like iOS Photos: zoom follows your fingers, edges stretch and spring back, flings glide to a stop
 - Fixed: a double tap outside the board could zoom the whole page, and pinching couldn't undo it

@@ -90,7 +90,10 @@ header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
 .stage{position:relative;min-height:0;display:grid;place-items:center;z-index:2;overflow:hidden;touch-action:none;border-radius:12px}
 #board{position:absolute;inset:0;width:100%;height:100%;display:block;overflow:visible}
 .stage.panning{cursor:grabbing}
-.zoom-chip{position:absolute;top:8px;right:8px;z-index:4;height:36px;padding-inline:14px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 4px 12px var(--shadow)}
+/* Fit board lives beside the timer, above the board, so it never covers arrows */
+.clock-row{display:flex;align-items:center;justify-content:flex-end;gap:10px;min-height:28px}
+.zoom-chip{height:28px;padding-inline:11px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-weight:700;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.zoom-chip svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .hit-area{fill:transparent;cursor:pointer}
 .dot{fill:var(--dot)}
 .arrow{pointer-events:none}
@@ -205,13 +208,15 @@ button{font:inherit;color:inherit}
     <div class="status">
       <div class="hearts" id="hearts"></div>
       <div class="meta" id="meta"></div>
-      <div class="clock"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2"/><path d="M10 2h4"/></svg><span id="clock">0:00</span></div>
+      <div class="clock-row">
+        <button class="zoom-chip" id="fitBtn" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5"/><path d="M20 9V4h-5"/><path d="M4 15v5h5"/><path d="M20 15v5h-5"/></svg>Fit board</button>
+        <div class="clock"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2"/><path d="M10 2h4"/></svg><span id="clock">0:00</span></div>
+      </div>
     </div>
   </header>
 
   <main class="stage" id="stage">
     <svg id="board" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMinYMin meet" role="application" aria-label="Puzzle board. Tap an arrow to release it."></svg>
-    <button class="zoom-chip" id="fitBtn" type="button" hidden>Fit board</button>
 
     <div class="overlay" id="winOv" hidden>
       <div class="card" role="dialog" aria-labelledby="winTitle">
@@ -670,7 +675,7 @@ function generateFrom(p, seedBase) {
 <script>
 (() => {
   // Bump with every release so the installed app shows which version it is running
-  const APP_VERSION = '1.3.0';
+  const APP_VERSION = '1.3.1';
   const APP_BUILD = '2026-10-07';
   const $ = (s) => document.querySelector(s);
   {
