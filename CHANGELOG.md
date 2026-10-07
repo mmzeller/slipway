@@ -2,6 +2,9 @@
 
 The version shows at the bottom of the Settings screen in the app.
 
+## 1.1.1 · Oct 7, 2026
+- The timer starts on your first arrow tap instead of when the board appears
+
 ## 1.1.0 · Oct 7, 2026
 - Version number shown at the bottom of Settings
 

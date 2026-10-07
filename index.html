@@ -670,7 +670,7 @@ function generateFrom(p, seedBase) {
 <script>
 (() => {
   // Bump with every release so the installed app shows which version it is running
-  const APP_VERSION = '1.1.0';
+  const APP_VERSION = '1.1.1';
   const APP_BUILD = '2026-10-07';
   const $ = (s) => document.querySelector(s);
   {
@@ -726,9 +726,9 @@ function generateFrom(p, seedBase) {
     return c;
   }
 
-  // ---------- Timer: runs only while the board is on screen and in play ----------
+  // ---------- Timer: starts on the first arrow tap, then runs only while the board is on screen and in play ----------
   function sheetsOpen() { return !$('#sheet').hidden || !$('#statsSheet').hidden; }
-  function timerStart() { if (G && !G.over && !G.running && !document.hidden && !sheetsOpen()) G.running = performance.now(); }
+  function timerStart() { if (G && G.started && !G.over && !G.running && !document.hidden && !sheetsOpen()) G.running = performance.now(); }
   function timerStop() {
     if (G && G.running) { const d = performance.now() - G.running; G.elapsed += d; G.running = 0; S.playMs += d; saveStats(); }
   }
@@ -840,7 +840,7 @@ function generateFrom(p, seedBase) {
       mode: spec.mode, level, day: spec.day || null, replay: !!spec.replay, diff,
       W: lv.W, H: lv.H, mask: lv.mask, shape: lv.shape,
       arrows: lv.arrows.map((a, i) => ({ id: i, cells: a.cells, dir: a.dir, removed: false, busy: false, pending: false })),
-      occ: null, hearts: 3, misses: 0, left: lv.arrows.length, over: false, hintId: -1, hintTimer: 0, elapsed: 0, running: 0
+      occ: null, hearts: 3, misses: 0, left: lv.arrows.length, over: false, hintId: -1, hintTimer: 0, elapsed: 0, running: 0, started: false
     };
     Z.s = 1; Z.tx = 0; Z.ty = 0;
     if (restore && restore.gen === GEN_VERSION && restore.diff === diff && Array.isArray(restore.removed)) {
@@ -849,6 +849,7 @@ function generateFrom(p, seedBase) {
       if (Number.isFinite(restore.misses)) G.misses = restore.misses;
       if (Number.isFinite(restore.elapsed)) G.elapsed = restore.elapsed;
       if (Array.isArray(restore.pending)) for (const id of restore.pending) if (G.arrows[id] && !G.arrows[id].removed) G.arrows[id].pending = true;
+      G.started = G.elapsed > 0 || G.left < G.arrows.length || G.misses > 0;
     }
     G.occ = occupancy(G.W, G.H, G.arrows, G.arrows.map((a) => a.removed));
     if (G.mode === 'levels') {
@@ -975,6 +976,7 @@ function generateFrom(p, seedBase) {
 
   function tap(a) {
     if (G.over || a.removed || a.busy) return;
+    if (!G.started) { G.started = true; timerStart(); }
     clearHint();
     const info = laneCheck(G.occ, G.W, G.H, a, a.id);
     if (info.free) release(a, info.k); else bump(a, info);
