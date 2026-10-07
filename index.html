@@ -88,7 +88,7 @@ header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
 
 /* Board */
 .stage{position:relative;min-height:0;display:grid;place-items:center;z-index:2;overflow:hidden;touch-action:none;border-radius:12px}
-#board{display:block;overflow:visible;transform-origin:0 0}
+#board{position:absolute;inset:0;width:100%;height:100%;display:block;overflow:visible}
 .stage.panning{cursor:grabbing}
 .zoom-chip{position:absolute;top:8px;right:8px;z-index:4;height:36px;padding-inline:14px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 4px 12px var(--shadow)}
 .hit-area{fill:transparent;cursor:pointer}
@@ -210,7 +210,7 @@ button{font:inherit;color:inherit}
   </header>
 
   <main class="stage" id="stage">
-    <svg id="board" xmlns="http://www.w3.org/2000/svg" role="application" aria-label="Puzzle board. Tap an arrow to release it."></svg>
+    <svg id="board" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMinYMin meet" role="application" aria-label="Puzzle board. Tap an arrow to release it."></svg>
     <button class="zoom-chip" id="fitBtn" type="button" hidden>Fit board</button>
 
     <div class="overlay" id="winOv" hidden>
@@ -670,7 +670,7 @@ function generateFrom(p, seedBase) {
 <script>
 (() => {
   // Bump with every release so the installed app shows which version it is running
-  const APP_VERSION = '1.2.0';
+  const APP_VERSION = '1.2.1';
   const APP_BUILD = '2026-10-07';
   const $ = (s) => document.querySelector(s);
   {
@@ -842,7 +842,7 @@ function generateFrom(p, seedBase) {
       arrows: lv.arrows.map((a, i) => ({ id: i, cells: a.cells, dir: a.dir, removed: false, busy: false, pending: false })),
       occ: null, hearts: 3, misses: 0, left: lv.arrows.length, over: false, hintId: -1, hintTimer: 0, elapsed: 0, running: 0, started: false
     };
-    Z.s = 1; Z.tx = 0; Z.ty = 0;
+    Z.s = 1; Z.cx = null; Z.cy = null;
     if (restore && restore.gen === GEN_VERSION && restore.diff === diff && Array.isArray(restore.removed)) {
       for (const id of restore.removed) if (G.arrows[id] && !G.arrows[id].removed) { G.arrows[id].removed = true; G.left--; }
       if (Number.isFinite(restore.hearts)) G.hearts = Math.max(1, Math.min(3, restore.hearts));
@@ -872,7 +872,7 @@ function generateFrom(p, seedBase) {
     G = saved;
     anims.clear();
     for (const a of G.arrows) { a.busy = false; a.bumpAnim = null; }
-    Z.s = 1; Z.tx = 0; Z.ty = 0;
+    Z.s = 1; Z.cx = null; Z.cy = null;
     syncTabs();
     render();
     updateHud();
@@ -932,11 +932,6 @@ function generateFrom(p, seedBase) {
 
   function layout() {
     if (!G) return;
-    const r = stage.getBoundingClientRect();
-    const cell = Math.max(12, Math.min(r.width / G.W, r.height / G.H, 64));
-    G.cellPx = cell;
-    svg.style.width = (cell * G.W) + 'px';
-    svg.style.height = (cell * G.H) + 'px';
     applyZoom();
   }
 
@@ -993,7 +988,7 @@ function generateFrom(p, seedBase) {
     G.left--;
     if (G.hintId === a.id) clearHint();
 
-    const screenCells = Math.ceil(Math.max(window.innerWidth, window.innerHeight) / ((G.cellPx || 30) * Z.s)) + 2;
+    const screenCells = Math.ceil(Math.max(window.innerWidth, window.innerHeight) / (G.cellPx || 30)) + 2;
     const dist = laneLen + a.cells.length + screenCells;
     const v0 = reduceMotion ? 90 : 6, acc = reduceMotion ? 0 : 60 * Math.max(1, G.W / 10);
     const g = a.g, trails = G.trails;
@@ -1048,7 +1043,7 @@ function generateFrom(p, seedBase) {
       else {
         drawArrow(a, 0);
         a.busy = false; a.bumpAnim = null;
-        setTimeout(() => { if (blk && blk.g && !blk.removed) blk.g.classList.remove('blocker'); }, 180);
+        setTimeout(() => { if (blk && blk.g && !blk.removed) blk.g.classList.remove('blocker'); }, 900);
         return true;
       }
       drawArrow(a, s);
@@ -1152,34 +1147,36 @@ function generateFrom(p, seedBase) {
   }
 
   // ---------- Input ----------
-  // Zoom state: the board is scaled and shifted inside the stage
-  const Z = { s: 1, tx: 0, ty: 0 };
-  function baseOffset() {
-    const sr = stage.getBoundingClientRect();
-    const w = parseFloat(svg.style.width) || 0, h = parseFloat(svg.style.height) || 0;
-    return { sw: sr.width, sh: sr.height, w, h, ox: (sr.width - w) / 2, oy: (sr.height - h) / 2, left: sr.left, top: sr.top };
-  }
-  function maxZoom() { return Math.min(6, Math.max(1, 46 / (G && G.cellPx ? G.cellPx : 46))); }
+  // View: the board always fills the stage. Zooming moves a window over it by changing the
+  // SVG viewBox, so the drawing can never spill past the frame on any browser.
+  // Z.s = zoom factor, (Z.cx, Z.cy) = board point (in cells) at the centre of the view.
+  const Z = { s: 1, cx: null, cy: null, fz: 0, vx: 0, vy: 0 };
+  function stageBox() { const r = stage.getBoundingClientRect(); return { left: r.left, top: r.top, w: r.width, h: r.height }; }
+  const baseFit = (b) => Math.min(b.w / G.W, b.h / G.H, 64); // screen px per cell with the whole board in view
+  function maxZoom() { return Math.min(6, Math.max(1, 46 / baseFit(stageBox()))); }
   function applyZoom() {
-    const b = baseOffset();
-    Z.s = Math.min(Math.max(1, Z.s), Math.max(1, maxZoom()));
-    const clampAxis = (t, view, size, o) => {
-      const scaled = size * Z.s;
-      if (scaled <= view) return (view - scaled) / 2 - o;
-      return Math.min(-o, Math.max(view - scaled - o, t));
-    };
-    Z.tx = clampAxis(Z.tx, b.sw, b.w, b.ox);
-    Z.ty = clampAxis(Z.ty, b.sh, b.h, b.oy);
-    svg.style.transform = Z.s === 1 ? '' : `translate(${Z.tx}px, ${Z.ty}px) scale(${Z.s})`;
+    if (!G) return;
+    const b = stageBox();
+    if (!(b.w > 0 && b.h > 0)) return;
+    Z.s = Math.min(Math.max(1, Z.s || 1), maxZoom());
+    const fz = baseFit(b) * Z.s, vw = b.w / fz, vh = b.h / fz;
+    if (Z.cx == null || Z.cy == null) { Z.cx = G.W / 2; Z.cy = G.H / 2; }
+    Z.cx = vw >= G.W ? G.W / 2 : Math.min(G.W - vw / 2, Math.max(vw / 2, Z.cx));
+    Z.cy = vh >= G.H ? G.H / 2 : Math.min(G.H - vh / 2, Math.max(vh / 2, Z.cy));
+    Z.fz = fz; Z.vx = Z.cx - vw / 2; Z.vy = Z.cy - vh / 2;
+    svg.setAttribute('viewBox', `${Z.vx.toFixed(4)} ${Z.vy.toFixed(4)} ${vw.toFixed(4)} ${vh.toFixed(4)}`);
+    G.cellPx = fz;
     $('#fitBtn').hidden = Z.s <= 1.01;
   }
   function zoomAt(clientX, clientY, newScale) {
-    const b = baseOffset();
+    if (!Z.fz) applyZoom();
+    const b = stageBox();
     const mx = clientX - b.left, my = clientY - b.top;
-    const lx = (mx - b.ox - Z.tx) / Z.s, ly = (my - b.oy - Z.ty) / Z.s;
+    const gx = Z.vx + mx / Z.fz, gy = Z.vy + my / Z.fz; // board point under the fingers stays put
     Z.s = Math.min(Math.max(1, newScale), maxZoom());
-    Z.tx = mx - b.ox - lx * Z.s;
-    Z.ty = my - b.oy - ly * Z.s;
+    const fz = baseFit(b) * Z.s;
+    Z.cx = gx - mx / fz + b.w / fz / 2;
+    Z.cy = gy - my / fz + b.h / fz / 2;
     applyZoom();
     if (Z.s > 1.05 && !store.get('zoomTipDone', false)) store.set('zoomTipDone', true); // tip clears on the next level, so the layout never shifts mid-pinch
   }
@@ -1187,10 +1184,11 @@ function generateFrom(p, seedBase) {
   // Finds the arrow nearest the touch point, so small cells stay easy to hit
   function hitTest(x, y) {
     if (!G || G.over) return;
-    const rect = svg.getBoundingClientRect();
-    if (!rect.width) return;
-    const gx = (x - rect.left) / rect.width * G.W, gy = (y - rect.top) / rect.height * G.H;
-    const cellScreen = rect.width / G.W;
+    applyZoom(); // re-sync with the frame's current size before mapping the touch
+    if (!Z.fz) return;
+    const b = stageBox();
+    const gx = Z.vx + (x - b.left) / Z.fz, gy = Z.vy + (y - b.top) / Z.fz;
+    const cellScreen = Z.fz;
     const radius = Math.max(0.72, 13 / cellScreen);
     const R = Math.ceil(radius) + 1, c0 = Math.floor(gx), r0 = Math.floor(gy);
     let best = -1, bd = Infinity;
@@ -1212,7 +1210,7 @@ function generateFrom(p, seedBase) {
     ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
     try { stage.setPointerCapture(e.pointerId); } catch (err) {}
     if (ptrs.size === 1) {
-      gesture = { type: 'tap', x0: e.clientX, y0: e.clientY, tx0: Z.tx, ty0: Z.ty, moved: false };
+      gesture = { type: 'tap', x0: e.clientX, y0: e.clientY, cx0: Z.cx, cy0: Z.cy, moved: false };
     } else if (ptrs.size === 2) {
       const [p1, p2] = [...ptrs.values()];
       gesture = { type: 'pinch', d0: Math.hypot(p1.x - p2.x, p1.y - p2.y) || 1, s0: Z.s };
@@ -1230,7 +1228,7 @@ function generateFrom(p, seedBase) {
       const dx = e.clientX - gesture.x0, dy = e.clientY - gesture.y0;
       if (gesture.type === 'tap' && Math.hypot(dx, dy) > 8) gesture.type = 'pan';
       if (gesture.type === 'pan' && Z.s > 1) {
-        Z.tx = gesture.tx0 + dx; Z.ty = gesture.ty0 + dy; applyZoom();
+        Z.cx = gesture.cx0 - dx / Z.fz; Z.cy = gesture.cy0 - dy / Z.fz; applyZoom();
         stage.classList.add('panning');
       }
     }
@@ -1243,7 +1241,7 @@ function generateFrom(p, seedBase) {
     else if (gesture && gesture.type === 'pinch') {
       // one finger lifted: continue as a pan from here, never as a tap
       const p = [...ptrs.values()][0];
-      gesture = { type: 'pan', x0: p.x, y0: p.y, tx0: Z.tx, ty0: Z.ty };
+      gesture = { type: 'pan', x0: p.x, y0: p.y, cx0: Z.cx, cy0: Z.cy };
     }
   }
   stage.addEventListener('pointerup', (e) => endPointer(e, false));
@@ -1251,10 +1249,10 @@ function generateFrom(p, seedBase) {
   stage.addEventListener('wheel', (e) => {
     if (!G) return;
     if (e.ctrlKey) { e.preventDefault(); zoomAt(e.clientX, e.clientY, Z.s * Math.exp(-e.deltaY * 0.01)); }
-    else if (Z.s > 1) { e.preventDefault(); Z.tx -= e.deltaX; Z.ty -= e.deltaY; applyZoom(); }
+    else if (Z.s > 1) { e.preventDefault(); Z.cx += e.deltaX / Z.fz; Z.cy += e.deltaY / Z.fz; applyZoom(); }
   }, { passive: false });
   document.addEventListener('gesturestart', (e) => e.preventDefault());
-  $('#fitBtn').addEventListener('click', () => { Z.s = 1; Z.tx = 0; Z.ty = 0; applyZoom(); });
+  $('#fitBtn').addEventListener('click', () => { Z.s = 1; Z.cx = null; Z.cy = null; applyZoom(); });
 
   $('#restartBtn').addEventListener('click', () => { if (G.mode === 'daily' && S.daily[G.day] && !G.replay) { openDaily(); return; } restartBoard(); });
   $('#hintBtn').addEventListener('click', hint);

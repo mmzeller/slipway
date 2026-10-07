@@ -2,6 +2,10 @@
 
 The version shows at the bottom of the Settings screen in the app.
 
+## 1.2.1 · Oct 7, 2026
+- Fixed: on iPhone the board could be drawn larger than its frame, cutting off outer rows and columns
+- The arrow that blocks you stays highlighted longer, so it's easier to spot
+
 ## 1.2.0 · Oct 7, 2026
 - Settings → Go to level accepts any level number, including levels you haven't played yet
 
