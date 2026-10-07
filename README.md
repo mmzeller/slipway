@@ -16,4 +16,4 @@ An ad-free arrow puzzle. Tap an arrow and it slides off the board along its line
 
 Progress and stats are stored on the device in the browser's local storage.
 
-To start at a level you reached elsewhere, open the address once with `?level=` and the number added, for example `?level=26`.
+The home-screen app keeps its own progress, separate from Safari. To pick up where you left off elsewhere, open **Settings → Go to level**, type the level number and tap **Play**.

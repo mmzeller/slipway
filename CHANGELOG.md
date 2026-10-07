@@ -2,6 +2,9 @@
 
 The version shows at the bottom of the Settings screen in the app.
 
+## 1.2.0 · Oct 7, 2026
+- Settings → Go to level accepts any level number, including levels you haven't played yet
+
 ## 1.1.1 · Oct 7, 2026
 - The timer starts on your first arrow tap instead of when the board appears
 

@@ -173,7 +173,7 @@ button{font:inherit;color:inherit}
 .stepper{display:flex;align-items:center;gap:6px;flex:none}
 .stepper button{width:40px;height:40px;border-radius:12px;border:1.5px solid var(--line);background:var(--paper);color:var(--ink);font-size:20px;line-height:1;cursor:pointer}
 .stepper button:disabled{opacity:.35;cursor:default}
-.stepper output{min-width:3ch;text-align:center;font-family:var(--font-display);font-size:24px;font-variant-numeric:tabular-nums}
+.stepper input{width:72px;height:40px;text-align:center;font-family:var(--font-display);font-size:22px;font-variant-numeric:tabular-nums;border:1.5px solid var(--line);border-radius:12px;background:var(--paper);color:var(--ink);-webkit-user-select:text;user-select:text;padding:0}
 .sheet-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
 .danger-text{color:var(--danger)}
 .version{margin:2px 0 0;text-align:center;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;-webkit-user-select:text;user-select:text}
@@ -287,12 +287,12 @@ button{font:inherit;color:inherit}
     </div>
     <div class="row">
       <div class="row-text">
-        <div class="row-title">Replay a level</div>
-        <div class="row-sub" id="reachedText">Any level you have reached.</div>
+        <div class="row-title">Go to level</div>
+        <div class="row-sub" id="reachedText">Type any level number, even one you haven't played.</div>
       </div>
       <div class="stepper">
         <button type="button" id="lvDown" aria-label="Previous level">−</button>
-        <output id="lvOut">1</output>
+        <input id="lvInput" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" aria-label="Level number" value="1">
         <button type="button" id="lvUp" aria-label="Next level">+</button>
       </div>
     </div>
@@ -670,7 +670,7 @@ function generateFrom(p, seedBase) {
 <script>
 (() => {
   // Bump with every release so the installed app shows which version it is running
-  const APP_VERSION = '1.1.1';
+  const APP_VERSION = '1.2.0';
   const APP_BUILD = '2026-10-07';
   const $ = (s) => document.querySelector(s);
   {
@@ -1272,14 +1272,14 @@ function generateFrom(p, seedBase) {
     $('#relaxedSw').setAttribute('aria-pressed', String(v));
     if (G) updateHud();
   }
-  function syncStepper() {
+  function syncStepper(fromInput) {
     const best = Math.max(store.get('best', 1), G && G.mode === 'levels' ? G.level : 1);
-    pickLevel = Math.min(Math.max(1, pickLevel), best);
-    $('#lvOut').textContent = pickLevel;
+    pickLevel = Math.min(Math.max(1, Math.floor(pickLevel) || 1), 99999);
+    if (!fromInput) $('#lvInput').value = pickLevel;
     $('#lvDown').disabled = pickLevel <= 1;
-    $('#lvUp').disabled = pickLevel >= best;
+    $('#lvUp').disabled = pickLevel >= 99999;
     $('#playLvBtn').textContent = `Play level ${pickLevel}`;
-    $('#reachedText').textContent = best > 1 ? `You have reached level ${best}.` : 'Levels unlock as you clear them.';
+    $('#reachedText').textContent = best > 1 ? `Your furthest level is ${best}. You can jump ahead to any level.` : "Type any level number, even one you haven't played.";
   }
   function disarmReset() { clearTimeout(resetArmed); resetArmed = 0; $('#resetLabel').textContent = 'Start over'; }
   function syncDiff() {
@@ -1325,6 +1325,12 @@ function generateFrom(p, seedBase) {
   });
   $('#lvDown').addEventListener('click', () => { pickLevel--; syncStepper(); });
   $('#lvUp').addEventListener('click', () => { pickLevel++; syncStepper(); });
+  $('#lvInput').addEventListener('input', () => {
+    const v = parseInt($('#lvInput').value.replace(/\D/g, ''), 10);
+    if (v > 0) { pickLevel = v; syncStepper(true); }
+  });
+  $('#lvInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('#lvInput').blur(); $('#playLvBtn').click(); } });
+  $('#lvInput').addEventListener('blur', () => syncStepper());
   $('#playLvBtn').addEventListener('click', () => { closeSheet(); switchMode('levels', pickLevel); });
   $('#resetBtn').addEventListener('click', () => {
     if (!resetArmed) {
