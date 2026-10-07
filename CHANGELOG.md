@@ -2,6 +2,11 @@
 
 The version shows at the bottom of the Settings screen in the app.
 
+## 1.3.0 · Oct 7, 2026
+- Pinch and drag on the board work like iOS Photos: zoom follows your fingers, edges stretch and spring back, flings glide to a stop
+- Fixed: a double tap outside the board could zoom the whole page, and pinching couldn't undo it
+- Faster redraws while zooming on big boards
+
 ## 1.2.1 · Oct 7, 2026
 - Fixed: on iPhone the board could be drawn larger than its frame, cutting off outer rows and columns
 - The arrow that blocks you stays highlighted longer, so it's easier to spot

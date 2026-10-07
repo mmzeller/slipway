@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="description" content="An ad-free arrow puzzle. Tap each arrow to slide it off the board once its lane is clear.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -47,12 +47,12 @@
   --accent:#86A6FF;--danger:#FF6F82;--shadow:rgba(0,0,0,.5);--scrim:rgba(0,0,0,.55);color-scheme:dark;
 }
 
-html{height:100%;box-sizing:border-box}
+html{height:100%;box-sizing:border-box;touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:100%}
 *,*::before,*::after{box-sizing:inherit}
 body{
   height:100%;margin:0;background:var(--paper);color:var(--ink);font-family:var(--font-ui);
   overflow:hidden;overscroll-behavior:none;-webkit-user-select:none;user-select:none;
-  -webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;
+  -webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;touch-action:manipulation;
 }
 .app{
   height:100%;max-width:620px;margin:0 auto;padding-inline:16px;padding-block:14px 12px;
@@ -670,7 +670,7 @@ function generateFrom(p, seedBase) {
 <script>
 (() => {
   // Bump with every release so the installed app shows which version it is running
-  const APP_VERSION = '1.2.1';
+  const APP_VERSION = '1.3.0';
   const APP_BUILD = '2026-10-07';
   const $ = (s) => document.querySelector(s);
   {
@@ -915,8 +915,9 @@ function generateFrom(p, seedBase) {
   function render() {
     svg.textContent = '';
     svg.setAttribute('viewBox', `0 0 ${G.W} ${G.H}`);
-    const dots = el('g', {}, svg);
-    for (let r = 0; r < G.H; r++) for (let c = 0; c < G.W; c++) if (G.mask[r * G.W + c]) el('circle', { class: 'dot', cx: c + 0.5, cy: r + 0.5, r: 0.06 }, dots);
+    let dd = '';
+    for (let r = 0; r < G.H; r++) for (let c = 0; c < G.W; c++) if (G.mask[r * G.W + c]) dd += `M${c + 0.44} ${r + 0.5}a.06 .06 0 1 0 .12 0a.06 .06 0 1 0 -.12 0`;
+    el('path', { class: 'dot', d: dd }, svg);
     G.trails = el('g', {}, svg);
     const ag = el('g', {}, svg);
     for (const a of G.arrows) {
@@ -932,7 +933,8 @@ function generateFrom(p, seedBase) {
 
   function layout() {
     if (!G) return;
-    applyZoom();
+    stopViewAnim();
+    settleView();
   }
 
   function heartSvg(lost) {
@@ -1147,47 +1149,119 @@ function generateFrom(p, seedBase) {
   }
 
   // ---------- Input ----------
-  // View: the board always fills the stage. Zooming moves a window over it by changing the
-  // SVG viewBox, so the drawing can never spill past the frame on any browser.
-  // Z.s = zoom factor, (Z.cx, Z.cy) = board point (in cells) at the centre of the view.
+  // ---------- View: the board fills the stage; zoom and pan move a window over it ----------
+  // The window is drawn through the SVG viewBox, so the board never spills past its frame.
+  // Z.s = zoom (1 = whole board), (Z.cx, Z.cy) = board point, in cells, at the centre of the view.
   const Z = { s: 1, cx: null, cy: null, fz: 0, vx: 0, vy: 0 };
   function stageBox() { const r = stage.getBoundingClientRect(); return { left: r.left, top: r.top, w: r.width, h: r.height }; }
-  const baseFit = (b) => Math.min(b.w / G.W, b.h / G.H, 64); // screen px per cell with the whole board in view
-  function maxZoom() { return Math.min(6, Math.max(1, 46 / baseFit(stageBox()))); }
-  function applyZoom() {
+  const baseFit = (b) => Math.min(b.w / G.W, b.h / G.H, 64);                 // px per cell at zoom 1
+  const maxZoom = (b) => Math.min(6, Math.max(1, 46 / baseFit(b || stageBox()))); // up to about 46px cells
+  function centreRange(b, s) {
+    const fz = baseFit(b) * s, vw = b.w / fz, vh = b.h / fz;
+    return {
+      x: vw >= G.W ? [G.W / 2, G.W / 2] : [vw / 2, G.W - vw / 2],
+      y: vh >= G.H ? [G.H / 2, G.H / 2] : [vh / 2, G.H - vh / 2]
+    };
+  }
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  // Past an edge or a zoom limit the board stretches with growing resistance (the iOS rubber-band curve)
+  const rubber = (x, d) => (x * d * 0.55) / (d + 0.55 * x);
+  const band = (v, lo, hi, d) => v < lo ? lo - rubber(lo - v, d) : v > hi ? hi + rubber(v - hi, d) : v;
+  const bandZoom = (s, lo, hi) => {
+    const L = 0.22; // at most about 25% past a limit
+    if (s > hi) return hi * Math.exp(L * (1 - Math.exp(-Math.log(s / hi) / L)));
+    if (s < lo) return lo * Math.exp(-L * (1 - Math.exp(-Math.log(lo / s) / L)));
+    return s;
+  };
+
+  function commitView() {
     if (!G) return;
     const b = stageBox();
     if (!(b.w > 0 && b.h > 0)) return;
-    Z.s = Math.min(Math.max(1, Z.s || 1), maxZoom());
-    const fz = baseFit(b) * Z.s, vw = b.w / fz, vh = b.h / fz;
     if (Z.cx == null || Z.cy == null) { Z.cx = G.W / 2; Z.cy = G.H / 2; }
-    Z.cx = vw >= G.W ? G.W / 2 : Math.min(G.W - vw / 2, Math.max(vw / 2, Z.cx));
-    Z.cy = vh >= G.H ? G.H / 2 : Math.min(G.H - vh / 2, Math.max(vh / 2, Z.cy));
+    const fz = baseFit(b) * Z.s, vw = b.w / fz, vh = b.h / fz;
     Z.fz = fz; Z.vx = Z.cx - vw / 2; Z.vy = Z.cy - vh / 2;
     svg.setAttribute('viewBox', `${Z.vx.toFixed(4)} ${Z.vy.toFixed(4)} ${vw.toFixed(4)} ${vh.toFixed(4)}`);
     G.cellPx = fz;
     $('#fitBtn').hidden = Z.s <= 1.01;
   }
-  function zoomAt(clientX, clientY, newScale) {
-    if (!Z.fz) applyZoom();
+  let commitRaf = 0;
+  const scheduleCommit = () => { if (!commitRaf) commitRaf = requestAnimationFrame(() => { commitRaf = 0; commitView(); }); };
+  function settleView() {
+    if (!G) return;
     const b = stageBox();
-    const mx = clientX - b.left, my = clientY - b.top;
-    const gx = Z.vx + mx / Z.fz, gy = Z.vy + my / Z.fz; // board point under the fingers stays put
-    Z.s = Math.min(Math.max(1, newScale), maxZoom());
-    const fz = baseFit(b) * Z.s;
-    Z.cx = gx - mx / fz + b.w / fz / 2;
-    Z.cy = gy - my / fz + b.h / fz / 2;
-    applyZoom();
-    if (Z.s > 1.05 && !store.get('zoomTipDone', false)) store.set('zoomTipDone', true); // tip clears on the next level, so the layout never shifts mid-pinch
+    if (!(b.w > 0 && b.h > 0)) return;
+    Z.s = clamp(Z.s || 1, 1, maxZoom(b));
+    if (Z.cx == null || Z.cy == null) { Z.cx = G.W / 2; Z.cy = G.H / 2; }
+    const R = centreRange(b, Z.s);
+    Z.cx = clamp(Z.cx, R.x[0], R.x[1]); Z.cy = clamp(Z.cy, R.y[0], R.y[1]);
+    commitView();
   }
+  const applyZoom = () => { stopViewAnim(); settleView(); };
+  const toBoard = (x, y) => { const b = stageBox(); return { x: Z.vx + (x - b.left) / Z.fz, y: Z.vy + (y - b.top) / Z.fz }; };
+
+  // Glides the view to a target with an iOS-style exponential slow-down
+  let viewAnim = 0;
+  function stopViewAnim() { if (viewAnim) { cancelAnimationFrame(viewAnim); viewAnim = 0; } }
+  function animateView(target, mode) {
+    stopViewAnim();
+    if (reduceMotion) { Object.assign(Z, target); commitView(); return; }
+    const from = { s: Z.s, cx: Z.cx, cy: Z.cy };
+    let t0 = null;
+    const step = (now) => {
+      if (t0 === null) t0 = now;
+      const t = now - t0;
+      let k, done;
+      if (mode === 'glide') { // momentum: iOS-like exponential slow-down
+        k = 1 - Math.exp(-t / 325);
+        const left = Math.hypot(target.cx - (from.cx + (target.cx - from.cx) * k), target.cy - (from.cy + (target.cy - from.cy) * k)) * Z.fz;
+        done = left < 0.5 && Math.abs(Math.log(target.s / from.s)) * (1 - k) < 0.002;
+      } else {                // spring back into bounds
+        const u = Math.min(1, t / 300);
+        k = 1 - Math.pow(1 - u, 3);
+        done = u >= 1;
+      }
+      if (done) k = 1;
+      Z.s = from.s * Math.pow(target.s / from.s, k);
+      Z.cx = from.cx + (target.cx - from.cx) * k;
+      Z.cy = from.cy + (target.cy - from.cy) * k;
+      commitView();
+      viewAnim = done ? 0 : requestAnimationFrame(step);
+    };
+    viewAnim = requestAnimationFrame(step);
+  }
+  // Where the view should come to rest: inside the limits, keeping the point under the fingers if the zoom changes
+  function restingView(anchor, glide) {
+    const b = stageBox();
+    const s = clamp(Z.s, 1, maxZoom(b));
+    let cx = Z.cx, cy = Z.cy;
+    if (anchor && s !== Z.s) {
+      const g = toBoard(anchor.x, anchor.y), fz = baseFit(b) * s;
+      cx = g.x - (anchor.x - b.left) / fz + b.w / fz / 2;
+      cy = g.y - (anchor.y - b.top) / fz + b.h / fz / 2;
+    }
+    if (glide) { cx += glide.x; cy += glide.y; }
+    const R = centreRange(b, s);
+    return { s, cx: clamp(cx, R.x[0], R.x[1]), cy: clamp(cy, R.y[0], R.y[1]) };
+  }
+  function zoomAt(clientX, clientY, newScale) { // trackpad and mouse-wheel zoom
+    stopViewAnim();
+    const b = stageBox(), g = toBoard(clientX, clientY);
+    Z.s = clamp(newScale, 1, maxZoom(b));
+    const fz = baseFit(b) * Z.s;
+    Z.cx = g.x - (clientX - b.left) / fz + b.w / fz / 2;
+    Z.cy = g.y - (clientY - b.top) / fz + b.h / fz / 2;
+    settleView();
+    noteZoomed();
+  }
+  function noteZoomed() { if (Z.s > 1.05 && !store.get('zoomTipDone', false)) store.set('zoomTipDone', true); } // tip clears on the next board, so the layout never shifts mid-pinch
 
   // Finds the arrow nearest the touch point, so small cells stay easy to hit
   function hitTest(x, y) {
     if (!G || G.over) return;
-    applyZoom(); // re-sync with the frame's current size before mapping the touch
+    if (!viewAnim) settleView();
     if (!Z.fz) return;
-    const b = stageBox();
-    const gx = Z.vx + (x - b.left) / Z.fz, gy = Z.vy + (y - b.top) / Z.fz;
+    const p = toBoard(x, y), gx = p.x, gy = p.y;
     const cellScreen = Z.fz;
     const radius = Math.max(0.72, 13 / cellScreen);
     const R = Math.ceil(radius) + 1, c0 = Math.floor(gx), r0 = Math.floor(gy);
@@ -1202,57 +1276,105 @@ function generateFrom(p, seedBase) {
     if (best >= 0 && bd <= radius) tap(G.arrows[best]);
   }
 
+  // ---------- Touch gestures on the board: tap, drag, pinch ----------
   const ptrs = new Map();
-  let gesture = null; // {type:'tap'|'pan'|'pinch', ...}
+  let gesture = null;
+  const mid = () => { const [a, c] = [...ptrs.values()]; return { x: (a.x + c.x) / 2, y: (a.y + c.y) / 2, d: Math.hypot(a.x - c.x, a.y - c.y) || 1 }; };
+  function startPan(x, y, caught) {
+    gesture = { type: 'tap', x0: x, y0: y, cx0: Z.cx, cy0: Z.cy, fz: Z.fz, caught, samples: [] };
+  }
+  function startPinch() {
+    const m = mid(), g = toBoard(m.x, m.y);
+    gesture = { type: 'pinch', d0: m.d, s0: Z.s, g, max: maxZoom(), last: m };
+  }
   stage.addEventListener('pointerdown', (e) => {
-    if (e.target.closest('.overlay, .zoom-chip')) return;
+    if (!G || e.target.closest('.overlay, .zoom-chip')) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const caught = !!viewAnim; // touching a gliding board just stops it, like iOS
+    stopViewAnim();
+    if (commitRaf) { cancelAnimationFrame(commitRaf); commitRaf = 0; commitView(); }
     ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
     try { stage.setPointerCapture(e.pointerId); } catch (err) {}
-    if (ptrs.size === 1) {
-      gesture = { type: 'tap', x0: e.clientX, y0: e.clientY, cx0: Z.cx, cy0: Z.cy, moved: false };
-    } else if (ptrs.size === 2) {
-      const [p1, p2] = [...ptrs.values()];
-      gesture = { type: 'pinch', d0: Math.hypot(p1.x - p2.x, p1.y - p2.y) || 1, s0: Z.s };
-    }
+    if (ptrs.size === 1) startPan(e.clientX, e.clientY, caught);
+    else if (ptrs.size === 2) startPinch();
     e.preventDefault();
   });
   stage.addEventListener('pointermove', (e) => {
     if (!ptrs.has(e.pointerId) || !gesture) return;
     ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const b = stageBox();
     if (gesture.type === 'pinch' && ptrs.size >= 2) {
-      const [p1, p2] = [...ptrs.values()];
-      const d = Math.hypot(p1.x - p2.x, p1.y - p2.y);
-      zoomAt((p1.x + p2.x) / 2, (p1.y + p2.y) / 2, gesture.s0 * d / gesture.d0);
+      const m = mid();
+      gesture.last = m;
+      const s = bandZoom(gesture.s0 * m.d / gesture.d0, 1, gesture.max);
+      const fz = baseFit(b) * s;
+      const R = centreRange(b, s);
+      Z.s = s;
+      Z.cx = band(gesture.g.x - (m.x - b.left) / fz + b.w / fz / 2, R.x[0], R.x[1], b.w / fz);
+      Z.cy = band(gesture.g.y - (m.y - b.top) / fz + b.h / fz / 2, R.y[0], R.y[1], b.h / fz);
+      scheduleCommit();
+      noteZoomed();
     } else if (gesture.type === 'tap' || gesture.type === 'pan') {
       const dx = e.clientX - gesture.x0, dy = e.clientY - gesture.y0;
       if (gesture.type === 'tap' && Math.hypot(dx, dy) > 8) gesture.type = 'pan';
-      if (gesture.type === 'pan' && Z.s > 1) {
-        Z.cx = gesture.cx0 - dx / Z.fz; Z.cy = gesture.cy0 - dy / Z.fz; applyZoom();
-        stage.classList.add('panning');
-      }
+      if (gesture.type !== 'pan') return;
+      const R = centreRange(b, Z.s);
+      const rx = gesture.cx0 - dx / gesture.fz, ry = gesture.cy0 - dy / gesture.fz;
+      Z.cx = band(rx, R.x[0], R.x[1], b.w / Z.fz);
+      Z.cy = band(ry, R.y[0], R.y[1], b.h / Z.fz);
+      const now = performance.now();
+      gesture.samples.push({ t: now, x: rx, y: ry });
+      while (gesture.samples.length > 2 && now - gesture.samples[0].t > 100) gesture.samples.shift();
+      stage.classList.add('panning');
+      scheduleCommit();
     }
   });
   function endPointer(e, cancelled) {
     if (!ptrs.has(e.pointerId)) return;
     ptrs.delete(e.pointerId);
-    if (gesture && gesture.type === 'tap' && !cancelled && ptrs.size === 0) hitTest(e.clientX, e.clientY);
-    if (ptrs.size === 0) { gesture = null; stage.classList.remove('panning'); }
-    else if (gesture && gesture.type === 'pinch') {
-      // one finger lifted: continue as a pan from here, never as a tap
+    if (!gesture) return;
+    if (ptrs.size === 1) {
+      // one finger lifted mid-pinch: carry on as a drag from here, never as a tap
       const p = [...ptrs.values()][0];
-      gesture = { type: 'pan', x0: p.x, y0: p.y, cx0: Z.cx, cy0: Z.cy };
+      startPan(p.x, p.y, true);
+      gesture.type = 'pan';
+      return;
     }
+    if (ptrs.size > 0) return;
+    const g = gesture;
+    gesture = null;
+    stage.classList.remove('panning');
+    if (commitRaf) { cancelAnimationFrame(commitRaf); commitRaf = 0; commitView(); }
+    if (g.type === 'tap') { if (!cancelled && !g.caught) hitTest(e.clientX, e.clientY); settleView(); return; }
+    if (g.type === 'pinch') { animateView(restingView(g.last), 'spring'); return; }
+    // drag released: keep gliding if the finger was still moving, then ease to a stop
+    let glide = null;
+    const sm = g.samples, now = performance.now();
+    if (sm.length >= 2 && now - sm[sm.length - 1].t < 60) {
+      const a = sm[0], z = sm[sm.length - 1], dt = Math.max(16, z.t - a.t);
+      const vx = (z.x - a.x) / dt, vy = (z.y - a.y) / dt; // cells per ms
+      const tau = 325;
+      if (Math.hypot(vx, vy) * Z.fz > 0.25) glide = { x: vx * tau, y: vy * tau };
+    }
+    const target = restingView(null, glide);
+    animateView(target, glide ? 'glide' : 'spring');
   }
   stage.addEventListener('pointerup', (e) => endPointer(e, false));
   stage.addEventListener('pointercancel', (e) => endPointer(e, true));
   stage.addEventListener('wheel', (e) => {
     if (!G) return;
     if (e.ctrlKey) { e.preventDefault(); zoomAt(e.clientX, e.clientY, Z.s * Math.exp(-e.deltaY * 0.01)); }
-    else if (Z.s > 1) { e.preventDefault(); Z.cx += e.deltaX / Z.fz; Z.cy += e.deltaY / Z.fz; applyZoom(); }
+    else if (Z.s > 1) { e.preventDefault(); stopViewAnim(); Z.cx += e.deltaX / Z.fz; Z.cy += e.deltaY / Z.fz; settleView(); }
   }, { passive: false });
-  document.addEventListener('gesturestart', (e) => e.preventDefault());
-  $('#fitBtn').addEventListener('click', () => { Z.s = 1; Z.cx = null; Z.cy = null; applyZoom(); });
+  $('#fitBtn').addEventListener('click', () => animateView({ s: 1, cx: G.W / 2, cy: G.H / 2 }, 'spring'));
+
+  // The page itself never zooms. If it ever ends up zoomed anyway, pinching out still works to undo it.
+  const pageZoomed = () => window.visualViewport && window.visualViewport.scale > 1.01;
+  for (const t of ['gesturestart', 'gesturechange', 'gestureend']) {
+    document.addEventListener(t, (e) => { if (!pageZoomed()) e.preventDefault(); }, { passive: false });
+  }
+  document.addEventListener('touchmove', (e) => { if (e.touches.length > 1 && !pageZoomed()) e.preventDefault(); }, { passive: false });
+  document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });
 
   $('#restartBtn').addEventListener('click', () => { if (G.mode === 'daily' && S.daily[G.day] && !G.replay) { openDaily(); return; } restartBoard(); });
   $('#hintBtn').addEventListener('click', hint);
