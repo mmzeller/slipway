@@ -335,7 +335,7 @@ button{font:inherit;color:inherit}
 
 <script id="gen">
 // ===GEN-START===
-const GEN_VERSION = 2;
+const GEN_VERSION = 3;
 const DR = [-1, 0, 1, 0], DC = [0, 1, 0, -1]; // up, right, down, left
 
 function mulberry32(a) {
@@ -347,7 +347,7 @@ function mulberry32(a) {
   };
 }
 
-// ---- Shapes: x runs -1..1 across the grid, y runs about -1.4..1.4 down it ----
+// Shapes: x runs -1..1 across the grid, y runs about -1.4..1.4 down it. Holes (eyes, belly, spots) are left empty.
 function inPoly(x, y, pts) {
   let inside = false;
   for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
@@ -364,38 +364,162 @@ function starPts(cx, cy, R, r, n) {
   }
   return pts;
 }
+const ell = (x, y, cx, cy, rx, ry) => ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1;
+const circ = (x, y, cx, cy, r) => (x - cx) ** 2 + (y - cy) ** 2 <= r * r;
+// rotated ellipse, angle in degrees
+const rell = (x, y, cx, cy, rx, ry, deg) => {
+  const a = deg * Math.PI / 180, dx = x - cx, dy = y - cy;
+  const u = dx * Math.cos(a) + dy * Math.sin(a), v = -dx * Math.sin(a) + dy * Math.cos(a);
+  return (u / rx) ** 2 + (v / ry) ** 2 <= 1;
+};
+// point near a segment, for snowflake arms and sun rays
+const nearSeg = (x, y, x1, y1, x2, y2, w) => {
+  const dx = x2 - x1, dy = y2 - y1, t = Math.max(0, Math.min(1, ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy)));
+  return Math.hypot(x - (x1 + t * dx), y - (y1 + t * dy)) <= w;
+};
 const STAR = starPts(0, 0.12, 1.12, 0.47, 5);
+const NEST = [1.2, 0.84, 0.56].map((R) => starPts(0, 0.14, R, R * 0.47, 5));
+
 const SHAPES = [
   { name: 'Heart', f: (x, y) => { const X = x * 1.12, Y = -y * 1.12 + 0.18; const a = X * X + Y * Y - 1; return a * a * a - X * X * Y * Y * Y <= 0; } },
+  { name: 'Penguin', f: (x, y) => {
+      const body = ell(x, y, 0, 0.3, 0.8, 0.98);
+      const head = ell(x, y, 0, -0.68, 0.6, 0.55);
+      const flippers = rell(x, y, -0.78, 0.25, 0.2, 0.55, 18) || rell(x, y, 0.78, 0.25, 0.2, 0.55, -18);
+      const feet = ell(x, y, -0.32, 1.3, 0.3, 0.1) || ell(x, y, 0.32, 1.3, 0.3, 0.1);
+      const belly = ell(x, y, 0, 0.42, 0.52, 0.75);
+      const face = ell(x, y, -0.2, -0.62, 0.2, 0.26) || ell(x, y, 0.2, -0.62, 0.2, 0.26);
+      const pupils = circ(x, y, -0.18, -0.64, 0.075) || circ(x, y, 0.18, -0.64, 0.075);
+      const beak = inPoly(x, y, [[-0.14, -0.36], [0.14, -0.36], [0, -0.16]]);
+      return ((body || head || flippers) && !belly && !(face && !pupils)) || feet || beak; } },
   { name: 'Star', f: (x, y) => inPoly(x, y, STAR) },
+  { name: 'Lion', f: (x, y) => {
+      const cy = 0.02, rho = Math.hypot(x, y - cy), th = Math.atan2(y - cy, x);
+      const maneR = 0.86 + 0.13 * Math.abs(Math.sin(4.5 * th));        // rounded tufts all the way round
+      const fd = Math.hypot(x / 0.92, y - 0.1);
+      const face = fd <= 0.55;
+      const mane = rho <= maneR && fd > 0.64;
+      const ears = circ(x, y, -0.4, -0.38, 0.15) || circ(x, y, 0.4, -0.38, 0.15);
+      const earIn = circ(x, y, -0.4, -0.38, 0.06) || circ(x, y, 0.4, -0.38, 0.06);
+      const eyes = circ(x, y, -0.2, 0.0, 0.08) || circ(x, y, 0.2, 0.0, 0.08);
+      const nose = inPoly(x, y, [[-0.14, 0.18], [0.14, 0.18], [0, 0.31]]);
+      const muzzle = (() => { const l = Math.hypot(x + 0.11, y - 0.36), r = Math.hypot(x - 0.11, y - 0.36);
+        return (Math.abs(l - 0.13) < 0.035 || Math.abs(r - 0.13) < 0.035) && y > 0.36; })();
+      return mane || (((face || ears) && !earIn) && !eyes && !nose && !muzzle); } },
   { name: 'Cat', f: (x, y) => {
       const head = (x * x) / 1.0 + ((y - 0.3) * (y - 0.3)) / 0.85 <= 1;
       const earL = inPoly(x, y, [[-0.98, -1.25], [-0.95, -0.2], [-0.3, -0.55]]);
       const earR = inPoly(x, y, [[0.98, -1.25], [0.95, -0.2], [0.3, -0.55]]);
-      return head || earL || earR; } },
-  { name: 'Diamond', f: (x, y) => Math.abs(x) + Math.abs(y) / 1.38 <= 1 },
-  { name: 'House', f: (x, y) => (Math.abs(x) <= 0.78 && y >= -0.15 && y <= 1.3) || (y >= -1.3 && y < -0.15 && Math.abs(x) <= (y + 1.3) / 1.15 * 1.0) || (x > 0.35 && x < 0.62 && y > -1.15 && y < -0.5) },
+      const eyes = ell(x, y, -0.38, 0.12, 0.13, 0.17) || ell(x, y, 0.38, 0.12, 0.13, 0.17);
+      const nose = inPoly(x, y, [[-0.12, 0.45], [0.12, 0.45], [0, 0.6]]);
+      return (head || earL || earR) && !eyes && !nose; } },
+  { name: 'Butterfly', f: (x, y) => {
+      const ax = Math.abs(x);
+      const upper = inPoly(ax, y, [[0.1, -0.12], [0.2, -0.62], [0.42, -0.98], [0.72, -1.08], [0.95, -0.92], [1.0, -0.55], [0.86, -0.22], [0.55, -0.04]]);
+      const lower = inPoly(ax, y, [[0.1, 0.02], [0.5, 0.06], [0.76, 0.26], [0.84, 0.58], [0.68, 0.9], [0.42, 0.98], [0.22, 0.78], [0.12, 0.42]]);
+      const spots = circ(ax, y, 0.62, -0.62, 0.13) || circ(ax, y, 0.46, 0.52, 0.1);
+      return (upper || lower) && !spots && ax > 0.09; } },
+  { name: 'House', f: (x, y) => {
+      const body = Math.abs(x) <= 0.78 && y >= -0.15 && y <= 1.3;
+      const roof = y >= -1.3 && y < -0.15 && Math.abs(x) <= (y + 1.3) / 1.15;
+      const chimney = x > 0.35 && x < 0.62 && y > -1.15 && y < -0.5;
+      const door = Math.abs(x) <= 0.17 && y > 0.75;
+      const win = (Math.abs(x + 0.45) <= 0.15 || Math.abs(x - 0.45) <= 0.15) && y > 0.15 && y < 0.45;
+      return (body || roof || chimney) && !door && !win; } },
+  { name: 'Owl', f: (x, y) => {
+      const body = ell(x, y, 0, 0.22, 0.86, 1.08);
+      const tufts = inPoly(x, y, [[-0.82, -0.55], [-0.88, -1.3], [-0.3, -0.82]]) || inPoly(x, y, [[0.82, -0.55], [0.88, -1.3], [0.3, -0.82]]);
+      const eyeRing = (cx) => { const d = Math.hypot(x - cx, y + 0.35); return d <= 0.33 && d >= 0.2; };
+      const beak = inPoly(x, y, [[-0.11, -0.12], [0.11, -0.12], [0, 0.1]]);
+      const chest = [[-0.3, 0.45], [0, 0.45], [0.3, 0.45], [-0.15, 0.75], [0.15, 0.75]].some(([cx, cy]) => ell(x, y, cx, cy, 0.09, 0.06));
+      const feet = ell(x, y, -0.3, 1.3, 0.2, 0.09) || ell(x, y, 0.3, 1.3, 0.2, 0.09);
+      return ((body || tufts) && !eyeRing(-0.38) && !eyeRing(0.38) && !beak && !chest) || feet; } },
+  { name: 'Nested Stars', f: (x, y) => {
+      const k = NEST.findIndex((p) => !inPoly(x, y, p)); // how many stars contain the point
+      const depth = k === -1 ? NEST.length : k;
+      return depth % 2 === 1; } },
+  { name: 'Turtle', f: (x, y) => {
+      const sx = x / 0.7, sy = (y - 0.1) / 0.88;
+      const shell = sx * sx + sy * sy <= 1;
+      const hexR = 0.38, ang = Math.atan2(y - 0.1, x), seg = Math.PI / 3;
+      const hexEdge = hexR * Math.cos(Math.PI / 6) / Math.cos(((ang % seg) + seg) % seg - Math.PI / 6);
+      const d = Math.hypot(x, y - 0.1);
+      const hexLine = Math.abs(d - hexEdge) < 0.05;
+      const rim = sx * sx + sy * sy > 0.78 && sx * sx + sy * sy < 0.86;
+      const head = ell(x, y, 0, -0.98, 0.24, 0.26);
+      const eyes = circ(x, y, -0.1, -1.02, 0.05) || circ(x, y, 0.1, -1.02, 0.05);
+      const legs = [[-0.68, -0.5, -35], [0.68, -0.5, 35], [-0.66, 0.78, 35], [0.66, 0.78, -35]].some(([cx, cy, a2]) => rell(x, y, cx, cy, 0.26, 0.15, a2));
+      return (shell && !hexLine && !rim) || legs || (head && !eyes); } },
   { name: 'Tree', f: (x, y) => {
       const tri = (top, bot, half) => y >= top && y <= bot && Math.abs(x) <= (y - top) / (bot - top) * half;
-      return tri(-1.38, -0.5, 0.62) || tri(-0.85, 0.15, 0.82) || tri(-0.3, 0.85, 1.0) || (Math.abs(x) <= 0.2 && y > 0.8 && y <= 1.38); } },
+      return tri(-1.38, -0.5, 0.62) || tri(-0.85, 0.15, 0.82) || tri(-0.3, 0.85, 1.0) || (Math.abs(x) <= 0.2 && y > 0.8 && y <= 1.2); } },
+  { name: 'Sun', f: (x, y) => {
+      const r = Math.hypot(x, y), th = Math.atan2(y, x);
+      if (r <= 0.5) return !(circ(x, y, -0.17, -0.1, 0.07) || circ(x, y, 0.17, -0.1, 0.07) || (r < 0.33 && r > 0.24 && y > 0.06));
+      if (r < 0.62 || r > 1.0) return false;
+      const n = 12, seg = (2 * Math.PI) / n, local = ((th % seg) + seg) % seg - seg / 2;
+      return Math.abs(local) * r < 0.15 * (1 - (r - 0.62) / 0.38) + 0.02; } },
+  { name: 'Paw Print', f: (x, y) => {
+      const pad = ell(x, y, 0, 0.5, 0.62, 0.48) || ell(x, y, -0.32, 0.72, 0.36, 0.3) || ell(x, y, 0.32, 0.72, 0.36, 0.3);
+      const toes = rell(x, y, -0.76, -0.2, 0.22, 0.3, -20) || rell(x, y, -0.28, -0.62, 0.24, 0.32, -6) || rell(x, y, 0.28, -0.62, 0.24, 0.32, 6) || rell(x, y, 0.76, -0.2, 0.22, 0.3, 20);
+      return pad || toes; } },
+  { name: 'Crown', f: (x, y) => {
+      const band = Math.abs(x) <= 0.92 && y >= 0.2 && y <= 0.72;
+      const points = inPoly(x, y, [[-0.92, 0.22], [-0.92, -0.55], [-0.46, -0.05], [0, -0.75], [0.46, -0.05], [0.92, -0.55], [0.92, 0.22]]);
+      const balls = circ(x, y, -0.9, -0.66, 0.12) || circ(x, y, 0, -0.86, 0.12) || circ(x, y, 0.9, -0.66, 0.12);
+      const jewels = circ(x, y, -0.5, 0.46, 0.1) || circ(x, y, 0, 0.46, 0.12) || circ(x, y, 0.5, 0.46, 0.1);
+      return ((band || points) && !jewels) || balls; } },
+  { name: 'Snowflake', f: (x, y) => {
+      if (Math.hypot(x, y) <= 0.2) return true;
+      for (let k = 0; k < 6; k++) {
+        const a = k * Math.PI / 3 - Math.PI / 2, ux = Math.cos(a), uy = Math.sin(a);
+        if (nearSeg(x, y, 0, 0, ux * 1.0, uy * 1.0, 0.085)) return true;
+        for (const [at, len] of [[0.45, 0.3], [0.72, 0.22]]) {
+          const bx = ux * at, by = uy * at;
+          for (const s of [1, -1]) {
+            const b = a + s * Math.PI / 4;
+            if (nearSeg(x, y, bx, by, bx + Math.cos(b) * len, by + Math.sin(b) * len, 0.075)) return true;
+          }
+        }
+      }
+      return false; } },
+  { name: 'Duck', f: (x, y) => {
+      const body = ell(x, y, 0.08, 0.5, 0.9, 0.55);
+      const head = circ(x, y, -0.32, -0.32, 0.44);
+      const beak = ell(x, y, -0.84, -0.22, 0.22, 0.11);
+      const tail = inPoly(x, y, [[0.72, 0.3], [1.0, -0.12], [0.95, 0.42]]);
+      const eye = circ(x, y, -0.4, -0.42, 0.07);
+      const wing = rell(x, y, 0.28, 0.45, 0.34, 0.15, -12) && !rell(x, y, 0.28, 0.42, 0.26, 0.09, -12);
+      return (body || head || beak || tail) && !eye && !wing; } },
+  { name: 'Fish', f: (x, y) => {
+      const body = ell(x, y, -0.18, 0.15, 0.72, 0.42);
+      const tail = inPoly(x, y, [[0.42, 0.15], [0.98, -0.25], [0.98, 0.55]]);
+      const eye = circ(x, y, -0.58, 0.06, 0.07);
+      const gill = (() => { const d = Math.hypot(x + 0.36, y - 0.15); return d < 0.24 && d > 0.17 && x > -0.36; })();
+      const bubbles = circ(x, y, -0.92, -0.42, 0.08) || circ(x, y, -0.74, -0.72, 0.11) || circ(x, y, -0.88, -1.08, 0.14);
+      return ((body || tail) && !eye && !gill) || bubbles; } },
+  { name: 'Apple', f: (x, y) => {
+      const body = ell(x, y, 0, 0.3, 0.92, 0.88) && !circ(x, y, 0, -0.62, 0.16);
+      const stem = inPoly(x, y, [[-0.04, -0.52], [0.1, -0.52], [0.2, -0.95], [0.08, -0.97]]);
+      const leaf = rell(x, y, 0.42, -0.78, 0.3, 0.12, -28);
+      const shine = rell(x, y, -0.5, 0.0, 0.08, 0.2, 25);
+      return (body && !shine) || stem || leaf; } },
   { name: 'Moon', f: (x, y) => (x * x + y * y <= 1.1) && ((x - 0.55) * (x - 0.55) + (y + 0.25) * (y + 0.25) > 0.8) },
-  { name: 'Mushroom', f: (x, y) => (y <= 0.05 && (x * x) / 1.0 + ((y + 0.05) * (y + 0.05)) / 1.2 <= 1) || (Math.abs(x) <= 0.38 + (y > 1.05 ? 0.1 : 0) && y > 0 && y <= 1.35) },
-  { name: 'Ring', f: (x, y) => { const d = x * x + (y * y) / 1.6; return d <= 1 && d >= 0.22; } },
+  { name: 'Diamond', f: (x, y) => Math.abs(x) + Math.abs(y) / 1.38 <= 1 },
   { name: 'Hourglass', f: (x, y) => Math.abs(y) <= 1.3 && (Math.abs(x) <= 0.14 + 0.86 * Math.abs(y) / 1.3 || Math.abs(y) > 1.1) },
-  { name: 'Plus', f: (x, y) => (Math.abs(x) <= 0.36 && Math.abs(y) <= 1.15) || (Math.abs(y) <= 0.36 && Math.abs(x) <= 1) },
-  { name: 'Rocket', f: (x, y) => {
-      const body = Math.abs(x) <= 0.42 && y >= -0.75 && y <= 0.9;
-      const nose = y < -0.75 && y >= -1.38 && Math.abs(x) <= 0.42 * Math.sqrt(Math.max(0, (y + 1.38) / 0.63));
-      const fins = y > 0.3 && y <= 1.25 && Math.abs(x) <= 0.42 + (y - 0.3) * 0.9 && Math.abs(x) <= 1;
-      return body || nose || fins; } }
+  { name: 'Plus', f: (x, y) => (Math.abs(x) <= 0.36 && Math.abs(y) <= 1.15) || (Math.abs(y) <= 0.36 && Math.abs(x) <= 1) }
 ];
+
+// Detailed pictures need a wider board for their eyes, spots and outlines to show
+const DETAILED = new Set(['Penguin', 'Lion', 'Cat', 'Butterfly', 'House', 'Owl', 'Nested Stars', 'Turtle', 'Sun', 'Paw Print', 'Crown', 'Snowflake', 'Duck', 'Fish', 'Apple']);
+SHAPES.forEach((sh) => { sh.min = DETAILED.has(sh.name) ? 22 : 12; });
 
 // Difficulty reshapes the base parameters. Standard leaves them untouched, so its boards never change.
 const DIFFICULTIES = ['casual', 'standard', 'expert'];
 function applyDifficulty(p, diff) {
   if (diff === 'casual') {
     let W = Math.max(4, Math.round(p.W * 0.7));
-    if (p.shape) W = Math.max(W, 13);
+    if (p.shape) W = Math.max(W, p.shape.min); // pictures need room to read
     return Object.assign({}, p, { W, H: Math.round(W * (p.H / p.W)), maxLen: Math.max(3, Math.round(p.maxLen * 0.55)),
       straight: Math.min(0.7, p.straight + 0.1), samples: 3, freeWeight: 0.4 });
   }
@@ -435,7 +559,7 @@ function baseLevelParams(level) {
   let shape = null;
   if (isShape) {
     shape = SHAPES[t <= 30 ? Math.floor((t - 5) / 3) % SHAPES.length : Math.floor(shapeRng() * SHAPES.length)];
-    W = Math.min(W + 4, 31);
+    W = Math.min(Math.max(W + 4, shape.min), 31);
   }
   return {
     W, H: Math.round(W * 1.38), shape,
@@ -675,7 +799,7 @@ function generateFrom(p, seedBase) {
 <script>
 (() => {
   // Bump with every release so the installed app shows which version it is running
-  const APP_VERSION = '1.3.1';
+  const APP_VERSION = '1.4.0';
   const APP_BUILD = '2026-10-07';
   const $ = (s) => document.querySelector(s);
   {

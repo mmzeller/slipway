@@ -2,6 +2,11 @@
 
 The version shows at the bottom of the Settings screen in the app.
 
+## 1.4.0 · Oct 7, 2026
+- New picture boards: lion, penguin, owl, turtle, butterfly, nested stars, sun, paw print, crown, snowflake, duck, fish and apple
+- Cat and house now have eyes, a nose, windows and a door
+- Removed the rocket, mushroom and ring shapes
+
 ## 1.3.1 · Oct 7, 2026
 - Fit board moved next to the timer, so it no longer covers arrows
 
