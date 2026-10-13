@@ -75,6 +75,10 @@ header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
 .lvl-label{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:700}
 .lvl-num{font-family:var(--font-display);font-size:clamp(44px,12.5vw,58px);line-height:.88;margin-top:6px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .status{display:flex;flex-direction:column;align-items:flex-end;gap:6px;padding-bottom:2px;min-width:0;text-align:right}
+.status-top{display:flex;align-items:center;justify-content:flex-end;gap:12px;min-height:20px}
+.best-tag{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.best-tag b{color:var(--ink);font-weight:700;transition:color .3s}
+.best-tag.behind b{color:var(--danger)}
 .hearts{display:flex;gap:6px;min-height:20px;align-items:center}
 .heart{width:22px;height:20px;display:block}
 .heart path{fill:var(--danger);stroke:var(--danger);stroke-width:1.6;stroke-linejoin:round;transition:fill .25s,stroke .25s}
@@ -105,7 +109,7 @@ header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
 .arrow.pending path,.arrow.blocker path{fill:var(--danger);stroke:var(--danger)}
 .arrow.hinted polyline{stroke:var(--accent)}
 .arrow.hinted path{fill:var(--accent);stroke:var(--accent)}
-.arrow.hinted{animation:pulse 1s ease-in-out infinite}
+.arrow.hinted{animation:pulse 1s ease-in-out 3}
 @keyframes pulse{50%{opacity:.4}}
 .trail{stroke:var(--accent);stroke-linecap:round;fill:none;opacity:0;animation:trail .7s ease-out forwards}
 @keyframes trail{0%{opacity:.3}100%{opacity:0}}
@@ -141,6 +145,11 @@ button{font:inherit;color:inherit}
 .btn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
 .btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .btn.icon{width:50px;padding:0}
+.btn:disabled{opacity:.45;cursor:default}
+.btn:disabled:active{transform:none}
+.pips{display:inline-flex;gap:3px;margin-left:2px}
+.pips i{width:8px;height:8px;border-radius:2px;border:1.5px solid currentColor;opacity:.5}
+.pips i.on{background:currentColor;opacity:1}
 .btn.quiet{background:transparent;border-color:transparent;color:var(--muted);height:42px}
 :focus-visible{outline:2.5px solid var(--accent);outline-offset:2px}
 
@@ -164,6 +173,15 @@ button{font:inherit;color:inherit}
 .cal .d.today{box-shadow:inset 0 0 0 2px var(--ink)}
 .cal .d.future{visibility:hidden}
 .foot-note{font-size:13px;color:var(--muted);margin-top:12px;line-height:1.45}
+.sec-sub{font-size:13px;color:var(--muted);margin:-4px 0 10px;line-height:1.4}
+.times{display:grid}
+.time-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:12px;width:100%;padding-block:11px;padding-inline:2px;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.time-row:active{background:var(--paper)}
+.time-row .lv{display:block;font-weight:700;font-size:15px}
+.time-row .sub{display:block;font-size:12px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
+.time-row .t{font-family:var(--font-display);font-size:22px;line-height:1.1;font-variant-numeric:tabular-nums;text-align:right}
+.time-row .t small{display:block;font-family:var(--font-ui);font-size:11px;color:var(--muted)}
+.time-row svg{width:16px;height:16px;stroke:var(--muted);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .sheet h3{font-family:var(--font-display);font-weight:400;font-size:28px;margin:0 0 4px}
 .row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-block:14px;border-bottom:1px solid var(--line)}
 .row-text{min-width:0}
@@ -206,7 +224,10 @@ button{font:inherit;color:inherit}
       <div class="lvl-num" id="lvlNum">1</div>
     </div>
     <div class="status">
-      <div class="hearts" id="hearts"></div>
+      <div class="status-top">
+        <span class="best-tag" id="bestTag" hidden></span>
+        <div class="hearts" id="hearts"></div>
+      </div>
       <div class="meta" id="meta"></div>
       <div class="clock-row">
         <button class="zoom-chip" id="fitBtn" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5"/><path d="M20 9V4h-5"/><path d="M4 15v5h5"/><path d="M20 15v5h-5"/></svg>Fit board</button>
@@ -253,7 +274,7 @@ button{font:inherit;color:inherit}
       </button>
       <button class="btn primary" id="hintBtn" type="button">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>
-        Hint
+        <span id="hintLabel">Hint</span><span class="pips" id="hintPips" hidden></span>
       </button>
       <button class="btn icon" id="settingsBtn" type="button" aria-label="Settings">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10"/><path d="M18 7h2"/><circle cx="16" cy="7" r="2"/><path d="M4 17h2"/><path d="M10 17h10"/><circle cx="8" cy="17" r="2"/></svg>
@@ -268,7 +289,7 @@ button{font:inherit;color:inherit}
     <div class="row">
       <div class="row-text">
         <div class="row-title">Difficulty</div>
-        <div class="row-sub">Board size and how tangled the lanes get. The current board restarts.</div>
+        <div class="row-sub">Board size and how tangled the lanes get. Hints per board: Casual unlimited, Standard 2, Expert 3. The current board restarts.</div>
       </div>
     </div>
     <div class="seg" id="diffSeg" role="group" aria-label="Difficulty" style="justify-self:start;margin-bottom:6px">
@@ -279,7 +300,7 @@ button{font:inherit;color:inherit}
     <div class="row">
       <div class="row-text">
         <div class="row-title">Relaxed mode</div>
-        <div class="row-sub">No hearts. Blocked arrows still turn red and wait their turn.</div>
+        <div class="row-sub">No hearts and unlimited hints. Blocked arrows still turn red and wait their turn.</div>
       </div>
       <button class="switch" id="relaxedSw" type="button" aria-pressed="false" aria-label="Relaxed mode"></button>
     </div>
@@ -328,6 +349,14 @@ button{font:inherit;color:inherit}
       <div class="tile"><b id="stPerfect">0</b><span>Cleared with no misses</span></div>
       <div class="tile"><b id="stArrows">0</b><span>Arrows released</span></div>
     </div>
+    <div class="sec-label">Best times</div>
+    <p class="sec-sub">Your fastest clear of each level. Tap one to replay it and try to beat it.</p>
+    <div class="seg" id="timesSeg" role="group" aria-label="Difficulty for best times" style="justify-self:start;margin-bottom:4px">
+      <button type="button" data-tdiff="casual" aria-pressed="false">Casual</button>
+      <button type="button" data-tdiff="standard" aria-pressed="true">Standard</button>
+      <button type="button" data-tdiff="expert" aria-pressed="false">Expert</button>
+    </div>
+    <div class="times" id="timesList"></div>
     <p class="foot-note" id="stPlay">Total play time 0m. Stats are kept on this device.</p>
     <button class="btn quiet" id="closeStats" type="button">Close</button>
   </div>
@@ -799,7 +828,7 @@ function generateFrom(p, seedBase) {
 <script>
 (() => {
   // Bump with every release so the installed app shows which version it is running
-  const APP_VERSION = '1.4.0';
+  const APP_VERSION = '1.5.0';
   const APP_BUILD = '2026-10-07';
   const $ = (s) => document.querySelector(s);
   {
@@ -841,8 +870,8 @@ function generateFrom(p, seedBase) {
   // ---------- Stats (kept in this browser) ----------
   const S = (() => {
     const saved = store.get('stats', null);
-    const base = { cleared: 0, perfect: 0, arrows: 0, playMs: 0, bestStreak: 0, daily: {} };
-    if (saved && typeof saved === 'object') return Object.assign(base, saved, { daily: Object.assign({}, saved.daily) });
+    const base = { cleared: 0, perfect: 0, arrows: 0, playMs: 0, bestStreak: 0, daily: {}, times: {} };
+    if (saved && typeof saved === 'object') return Object.assign(base, saved, { daily: Object.assign({}, saved.daily), times: Object.assign({}, saved.times) });
     base.cleared = Math.max(0, store.get('best', 1) - 1); // credit levels cleared before stats existed
     return base;
   })();
@@ -862,7 +891,7 @@ function generateFrom(p, seedBase) {
     if (G && G.running) { const d = performance.now() - G.running; G.elapsed += d; G.running = 0; S.playMs += d; saveStats(); }
   }
   const elapsedMs = () => G ? G.elapsed + (G.running ? performance.now() - G.running : 0) : 0;
-  setInterval(() => { if (G) $('#clock').textContent = fmtTime(elapsedMs()); }, 500);
+  setInterval(() => { if (G) { $('#clock').textContent = fmtTime(elapsedMs()); syncBestTag(); } }, 500);
 
   // ---------- Sound ----------
   const sound = (() => {
@@ -969,7 +998,7 @@ function generateFrom(p, seedBase) {
       mode: spec.mode, level, day: spec.day || null, replay: !!spec.replay, diff,
       W: lv.W, H: lv.H, mask: lv.mask, shape: lv.shape,
       arrows: lv.arrows.map((a, i) => ({ id: i, cells: a.cells, dir: a.dir, removed: false, busy: false, pending: false })),
-      occ: null, hearts: 3, misses: 0, left: lv.arrows.length, over: false, hintId: -1, hintTimer: 0, elapsed: 0, running: 0, started: false
+      occ: null, hearts: 3, misses: 0, left: lv.arrows.length, over: false, hintId: -1, hintTimer: 0, hintsUsed: 0, elapsed: 0, running: 0, started: false
     };
     Z.s = 1; Z.cx = null; Z.cy = null;
     if (restore && restore.gen === GEN_VERSION && restore.diff === diff && Array.isArray(restore.removed)) {
@@ -977,6 +1006,8 @@ function generateFrom(p, seedBase) {
       if (Number.isFinite(restore.hearts)) G.hearts = Math.max(1, Math.min(3, restore.hearts));
       if (Number.isFinite(restore.misses)) G.misses = restore.misses;
       if (Number.isFinite(restore.elapsed)) G.elapsed = restore.elapsed;
+      if (Number.isFinite(restore.hintsUsed)) G.hintsUsed = restore.hintsUsed;
+      if (Number.isFinite(restore.hintId) && G.arrows[restore.hintId] && !G.arrows[restore.hintId].removed) G.hintId = restore.hintId;
       if (Array.isArray(restore.pending)) for (const id of restore.pending) if (G.arrows[id] && !G.arrows[id].removed) G.arrows[id].pending = true;
       G.started = G.elapsed > 0 || G.left < G.arrows.length || G.misses > 0;
     }
@@ -1051,7 +1082,7 @@ function generateFrom(p, seedBase) {
     const ag = el('g', {}, svg);
     for (const a of G.arrows) {
       if (a.removed) continue;
-      a.g = el('g', { class: a.pending ? 'arrow pending' : 'arrow' }, ag);
+      a.g = el('g', { class: 'arrow' + (a.pending ? ' pending' : '') + (G.hintId === a.id ? ' hinted' : '') }, ag);
       a.poly = el('polyline', { 'stroke-width': STROKE }, a.g);
       a.head = el('path', { d: HEAD, 'stroke-width': 0.06 }, a.g);
       drawArrow(a, 0);
@@ -1087,6 +1118,8 @@ function generateFrom(p, seedBase) {
       }
     }
     $('#meta').textContent = `${G.shape ? G.shape + ' · ' : ''}${G.W} × ${G.H} · ${G.left} ${G.left === 1 ? 'arrow' : 'arrows'} left`;
+    syncBestTag();
+    updateHintBtn();
     const tip = $('#tip');
     if (G.mode === 'levels' && G.level <= 2) { tip.textContent = G.level === 1 ? 'Tap an arrow to slide it off the board. It only leaves if nothing sits in its lane.' : 'Tap a blocked arrow and it turns red. It leaves on its own once the arrow in its way is gone.'; tip.hidden = false; }
     else if (G.W >= 14 && !store.get('zoomTipDone', false)) { tip.textContent = 'Pinch to zoom in on big boards. Drag to move around while zoomed.'; tip.hidden = false; }
@@ -1103,7 +1136,6 @@ function generateFrom(p, seedBase) {
   function tap(a) {
     if (G.over || a.removed || a.busy) return;
     if (!G.started) { G.started = true; timerStart(); }
-    clearHint();
     const info = laneCheck(G.occ, G.W, G.H, a, a.id);
     if (info.free) release(a, info.k); else bump(a, info);
   }
@@ -1206,6 +1238,12 @@ function generateFrom(p, seedBase) {
       if (G.level + 1 > store.get('best', 1)) store.set('best', G.level + 1);
       S.cleared++;
       if (G.misses === 0) S.perfect++;
+      // Personal best for this level at this difficulty
+      const key = `${G.diff}:${G.level}`, prev = S.times[key], ms = Math.round(G.elapsed);
+      G.prevBest = prev ? prev.ms : null;
+      G.newBest = !prev || ms < prev.ms;
+      if (G.newBest) S.times[key] = { ms, misses: G.misses, hints: G.hintsUsed, day: todayKey(), plays: (prev ? prev.plays || 1 : 0) + 1 };
+      else prev.plays = (prev.plays || 1) + 1;
     } else if (!G.replay && !S.daily[G.day]) {
       S.daily[G.day] = { ms: Math.round(G.elapsed), misses: G.misses, diff: G.diff };
       S.bestStreak = Math.max(S.bestStreak || 0, currentStreak());
@@ -1221,6 +1259,25 @@ function generateFrom(p, seedBase) {
     $('#winAltBtn').hidden = !alt; $('#winAltBtn').textContent = alt || ''; winAltAction = onAlt || null;
   }
   const missText = (m) => m === 0 ? 'no misses' : m === 1 ? '1 miss' : m + ' misses';
+  const hintText = (h) => h ? ` · ${h} ${h === 1 ? 'hint' : 'hints'}` : '';
+  const fmtDiff = (ms) => ms < 100 ? 'under 0.1s' : ms < 60000 ? (ms / 1000).toFixed(1) + 's' : fmtBest(ms);
+  // Finished times show tenths, so two runs in the same second still compare
+  const fmtBest = (ms) => fmtTime(ms) + '.' + Math.floor((ms % 1000) / 100);
+
+  // Best time for the board on screen, shown beside the hearts while you play
+  function boardBest() {
+    if (!G) return null;
+    if (G.mode === 'levels') { const r = S.times[`${G.diff}:${G.level}`]; return r ? r.ms : null; }
+    return S.daily[G.day] && (G.replay || G.over) ? S.daily[G.day].ms : null;
+  }
+  function syncBestTag() {
+    const tag = $('#bestTag'), best = boardBest();
+    if (best == null) { tag.hidden = true; return; }
+    const txt = fmtBest(best);
+    if (tag.dataset.t !== txt) { tag.innerHTML = `Best <b>${txt}</b>`; tag.dataset.t = txt; }
+    tag.classList.toggle('behind', !G.over && elapsedMs() > best);
+    tag.hidden = false;
+  }
   function streakText() {
     const c = currentStreak(), b = Math.max(S.bestStreak || 0, c);
     return `Streak: ${c} ${c === 1 ? 'day' : 'days'}` + (b > c ? ` · best ${b}` : '');
@@ -1232,16 +1289,22 @@ function generateFrom(p, seedBase) {
     if (daily) {
       $('#winEyebrow').textContent = `Daily · ${prettyDay(G.day)}`;
       $('#winTitle').textContent = G.replay ? 'Solved again' : 'Daily solved';
-      $('#winDetail').textContent = `${fmtTime(G.elapsed)} · ${G.arrows.length} arrows · ${missText(G.misses)}`;
+      const first = G.replay && S.daily[G.day] ? ` · first solve ${fmtTime(S.daily[G.day].ms)}` : '';
+      $('#winDetail').textContent = `${fmtTime(G.elapsed)} · ${G.arrows.length} arrows · ${missText(G.misses)}${hintText(G.hintsUsed)}${first}`;
       streak.textContent = streakText(); streak.hidden = false;
       setWinButtons('Back to levels', () => switchMode('levels'), 'See stats', openStats);
     } else {
-      $('#winEyebrow').textContent = `Level ${G.level}`;
-      $('#winTitle').textContent = 'Board clear';
-      $('#winDetail').textContent = `Cleared in ${fmtTime(G.elapsed)} · ${G.arrows.length} arrows · ${missText(G.misses)}`;
-      streak.hidden = true;
-      const dailyOpen = !S.daily[todayKey()];
-      setWinButtons('Next level', () => loadLevel(G.level + 1), dailyOpen ? "Play today's daily" : null, () => switchMode('daily'));
+      const ms = Math.round(G.elapsed), prev = G.prevBest;
+      $('#winEyebrow').textContent = `Level ${G.level}` + (G.diff !== 'standard' ? ` · ${cap(G.diff)}` : '');
+      $('#winTitle').textContent = G.newBest && prev != null ? 'New best time' : 'Board clear';
+      $('#winDetail').textContent = `Cleared in ${fmtBest(ms)} · ${G.arrows.length} arrows · ${missText(G.misses)}${hintText(G.hintsUsed)}`;
+      if (prev == null) streak.textContent = 'Your first time on this level. Replay it any time from Stats to beat it.';
+      else if (G.newBest) streak.textContent = `${fmtDiff(prev - ms)} faster than your old best of ${fmtBest(prev)}.`;
+      else streak.textContent = `Your best is still ${fmtBest(prev)}, ${fmtDiff(ms - prev)} faster.`;
+      streak.hidden = false;
+      const furthest = store.get('best', 1), dailyOpen = !S.daily[todayKey()];
+      if (G.level + 1 < furthest) setWinButtons(`Back to level ${furthest}`, () => loadLevel(furthest), 'Play it again', restartBoard);
+      else setWinButtons('Next level', () => loadLevel(G.level + 1), dailyOpen ? "Play today's daily" : 'Play it again', dailyOpen ? () => switchMode('daily') : restartBoard);
     }
     $('#winOv').hidden = false;
     $('#nextBtn').focus({ preventScroll: true });
@@ -1263,18 +1326,56 @@ function generateFrom(p, seedBase) {
     $('#retryBtn').focus({ preventScroll: true });
   }
 
+  // Hints per board: Casual and Relaxed unlimited, Standard 2, Expert 3. Restarting a board refills them.
+  const HINT_LIMIT = { casual: Infinity, standard: 2, expert: 3 };
+  function hintLimit() { return settings.relaxed ? Infinity : (HINT_LIMIT[G.diff] ?? 2); }
+  function updateHintBtn() {
+    if (!G) return;
+    const lim = hintLimit(), btn = $('#hintBtn'), pips = $('#hintPips');
+    if (!Number.isFinite(lim)) {
+      pips.hidden = true; pips.innerHTML = '';
+      $('#hintLabel').textContent = 'Hint'; btn.disabled = false; btn.setAttribute('aria-label', 'Hint');
+      return;
+    }
+    const left = Math.max(0, lim - G.hintsUsed), out = left === 0 && G.hintId < 0;
+    pips.hidden = false;
+    pips.innerHTML = Array.from({ length: lim }, (_, i) => `<i class="${i < left ? 'on' : ''}"></i>`).join('');
+    $('#hintLabel').textContent = out ? 'No hints' : 'Hint';
+    btn.disabled = out;
+    btn.setAttribute('aria-label', out ? 'No hints left on this board' : `Hint, ${left} of ${lim} left`);
+  }
+  // Pans the view to a hinted arrow when you're zoomed in and it's off screen
+  function revealArrow(a) {
+    if (Z.s <= 1.01 || !Z.fz) return;
+    const b = stageBox(), vw = b.w / Z.fz, vh = b.h / Z.fz;
+    const xs = a.cells.map((c) => c[1] + 0.5), ys = a.cells.map((c) => c[0] + 0.5);
+    const seen = xs.every((x) => x > Z.vx + 0.4 && x < Z.vx + vw - 0.4) && ys.every((y) => y > Z.vy + 0.4 && y < Z.vy + vh - 0.4);
+    if (seen) return;
+    const R = centreRange(b, Z.s);
+    const mx = (Math.min(...xs) + Math.max(...xs)) / 2, my = (Math.min(...ys) + Math.max(...ys)) / 2;
+    animateView({ s: Z.s, cx: clamp(mx, R.x[0], R.x[1]), cy: clamp(my, R.y[0], R.y[1]) }, 'spring');
+  }
   function hint() {
     if (!G || G.over) return;
-    clearHint();
+    // A hint stays lit until you use it. Pressing again just shows it again, free.
+    const shown = G.hintId >= 0 ? G.arrows[G.hintId] : null;
+    if (shown && !shown.removed && shown.g) {
+      shown.g.classList.remove('hinted'); void shown.g.getBoundingClientRect(); shown.g.classList.add('hinted');
+      revealArrow(shown);
+      return;
+    }
+    if (G.hintsUsed >= hintLimit()) return;
     let pick = null;
     for (const a of G.arrows) {
       if (a.removed || a.busy || a.pending) continue;
       if (laneCheck(G.occ, G.W, G.H, a, a.id).free && (!pick || a.cells.length > pick.cells.length)) pick = a;
     }
     if (!pick) return;
+    G.hintsUsed++;
     G.hintId = pick.id;
     pick.g.classList.add('hinted');
-    G.hintTimer = setTimeout(clearHint, 2600);
+    revealArrow(pick);
+    updateHintBtn();
   }
 
   // ---------- Input ----------
@@ -1519,7 +1620,7 @@ function generateFrom(p, seedBase) {
   function setRelaxed(v) {
     settings.relaxed = v; store.set('relaxed', v);
     $('#relaxedSw').setAttribute('aria-pressed', String(v));
-    if (G) updateHud();
+    if (G) updateHud(); // also refreshes the hint button: Relaxed mode has unlimited hints
   }
   function syncStepper(fromInput) {
     const best = Math.max(store.get('best', 1), G && G.mode === 'levels' ? G.level : 1);
@@ -1621,10 +1722,36 @@ function generateFrom(p, seedBase) {
       html += `<div class="${cls.join(' ')}" title="${prettyDay(k)}${S.daily[k] ? ' · solved in ' + fmtTime(S.daily[k].ms) : ''}"></div>`;
     }
     cal.innerHTML = html;
+    renderTimes(diff);
     $('#statsSheet').hidden = false;
     $('#closeStats').focus({ preventScroll: true });
   }
   function closeStats() { $('#statsSheet').hidden = true; timerStart(); }
+
+  const CHEVRON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
+  function renderTimes(d) {
+    for (const b of document.querySelectorAll('#timesSeg button')) b.setAttribute('aria-pressed', String(b.dataset.tdiff === d));
+    const rows = Object.keys(S.times).filter((k) => k.startsWith(d + ':'))
+      .map((k) => Object.assign({ level: +k.split(':')[1] }, S.times[k])).sort((a, b) => a.level - b.level);
+    const list = $('#timesList');
+    if (!rows.length) { list.innerHTML = `<p class="foot-note">No ${cap(d)} times yet. Clear a level and its time shows up here.</p>`; return; }
+    list.innerHTML = rows.map((r) => {
+      const sh = levelParams(r.level, d).shape;
+      const sub = `${sh ? sh.name + ' · ' : ''}${missText(r.misses)}${hintText(r.hints)}${r.plays > 1 ? ` · ${r.plays} clears` : ''}`;
+      return `<button type="button" class="time-row" data-level="${r.level}" data-diff="${d}" aria-label="Replay level ${r.level}, best ${fmtBest(r.ms)}">` +
+        `<span><span class="lv">Level ${r.level}</span><span class="sub">${sub}</span></span>` +
+        `<span class="t">${fmtBest(r.ms)}<small>${r.day ? prettyDay(r.day) : ''}</small></span>${CHEVRON}</button>`;
+    }).join('');
+  }
+  for (const b of document.querySelectorAll('#timesSeg button')) b.addEventListener('click', () => renderTimes(b.dataset.tdiff));
+  $('#timesList').addEventListener('click', (e) => {
+    const row = e.target.closest('.time-row');
+    if (!row) return;
+    const level = +row.dataset.level, d = row.dataset.diff;
+    $('#statsSheet').hidden = true;
+    if (d !== diff && DIFFICULTIES.includes(d)) { diff = d; store.set('difficulty', d); stash.levels = stash.daily = null; syncDiff(); }
+    switchMode('levels', level);
+  });
   $('#statsBtn').addEventListener('click', openStats);
   $('#closeStats').addEventListener('click', closeStats);
   $('#statsSheet').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeStats(); });
@@ -1642,7 +1769,7 @@ function generateFrom(p, seedBase) {
   // ---------- Boot (keeps your place across page updates) ----------
   const hot = window.claude && window.claude.hot;
   if (hot && typeof hot.snapshot === 'function') {
-    hot.snapshot(() => G ? { gen: GEN_VERSION, mode: G.mode, day: G.day, replay: G.replay, diff: G.diff, elapsed: elapsedMs(), level: G.level, removed: G.arrows.filter((a) => a.removed).map((a) => a.id), pending: G.arrows.filter((a) => a.pending && !a.removed).map((a) => a.id), hearts: G.hearts, misses: G.misses } : {});
+    hot.snapshot(() => G ? { gen: GEN_VERSION, mode: G.mode, day: G.day, replay: G.replay, diff: G.diff, elapsed: elapsedMs(), level: G.level, removed: G.arrows.filter((a) => a.removed).map((a) => a.id), pending: G.arrows.filter((a) => a.pending && !a.removed).map((a) => a.id), hearts: G.hearts, misses: G.misses, hintsUsed: G.hintsUsed, hintId: G.hintId } : {});
   }
   // A one-time ?level=N link carries progress over from another copy of the game
   try {

@@ -2,6 +2,12 @@
 
 The version shows at the bottom of the Settings screen in the app.
 
+## 1.5.0 · Oct 12, 2026
+- Best times: your fastest clear of every level is saved per difficulty, shown beside the hearts while you play, and listed in Stats, where tapping a level replays it
+- The win card says whether you beat your best, and after a replay offers a quick way back to your furthest level
+- Hints are limited per board: Standard 2, Expert 3, Casual and Relaxed mode unlimited. Squares on the Hint button show what's left
+- A hint now stays lit until you use it, and brings the arrow into view when you're zoomed in
+
 ## 1.4.0 · Oct 7, 2026
 - New picture boards: lion, penguin, owl, turtle, butterfly, nested stars, sun, paw print, crown, snowflake, duck, fish and apple
 - Cat and house now have eyes, a nose, windows and a door
