@@ -183,6 +183,11 @@ button{font:inherit;color:inherit}
 .time-row .t{font-family:var(--font-display);font-size:22px;line-height:1.1;font-variant-numeric:tabular-nums;text-align:right}
 .time-row .t small{display:block;font-family:var(--font-ui);font-size:11px;color:var(--muted)}
 .time-row svg{width:16px;height:16px;stroke:var(--muted);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chip{height:32px;padding-inline:12px;border-radius:999px;border:1.5px solid var(--line);background:transparent;color:var(--muted);font:inherit;font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.chip svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.sort-note{font-size:12px;color:var(--muted);margin:8px 0 2px;line-height:1.4}
 .sheet h3{font-family:var(--font-display);font-weight:400;font-size:28px;margin:0 0 4px}
 .row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-block:14px;border-bottom:1px solid var(--line)}
 .row-text{min-width:0}
@@ -365,11 +370,21 @@ button{font:inherit;color:inherit}
       <div class="tile"><b id="stArrows">0</b><span>Arrows released</span></div>
     </div>
     <div class="sec-label">Best times</div>
-    <p class="sec-sub">Your fastest clear of each level. Tap one to replay it and try to beat it.</p>
+    <p class="sec-sub">Your fastest clear of each level, with the misses and hints from that run. Tap one to replay it and try to beat it.</p>
     <div class="seg" id="timesSeg" role="group" aria-label="Difficulty for best times" style="justify-self:start;margin-bottom:4px">
       <button type="button" data-tdiff="casual" aria-pressed="false">Casual</button>
       <button type="button" data-tdiff="standard" aria-pressed="true">Standard</button>
       <button type="button" data-tdiff="expert" aria-pressed="false">Expert</button>
+    </div>
+    <div id="sortBox" hidden>
+      <div class="chips" id="sortChips" role="group" aria-label="Sort best times">
+        <button type="button" class="chip" data-sort="level">Level</button>
+        <button type="button" class="chip" data-sort="time">Time</button>
+        <button type="button" class="chip" data-sort="hints">Hints</button>
+        <button type="button" class="chip" data-sort="misses">Misses</button>
+        <button type="button" class="chip" data-sort="overall">Overall</button>
+      </div>
+      <p class="sort-note" id="sortNote"></p>
     </div>
     <div class="times" id="timesList"></div>
     <p class="foot-note" id="stPlay">Total play time 0m. Stats are kept on this device.</p>
@@ -843,7 +858,7 @@ function generateFrom(p, seedBase) {
 <script>
 (() => {
   // Bump with every release so the installed app shows which version it is running
-  const APP_VERSION = '1.5.1';
+  const APP_VERSION = '1.6.0';
   const APP_BUILD = '2026-10-07';
   const $ = (s) => document.querySelector(s);
   {
@@ -1257,8 +1272,8 @@ function generateFrom(p, seedBase) {
       const key = `${G.diff}:${G.level}`, prev = S.times[key], ms = Math.round(G.elapsed);
       G.prevBest = prev ? prev.ms : null;
       G.newBest = !prev || ms < prev.ms;
-      if (G.newBest) S.times[key] = { ms, misses: G.misses, hints: G.hintsUsed, day: todayKey(), plays: (prev ? prev.plays || 1 : 0) + 1 };
-      else prev.plays = (prev.plays || 1) + 1;
+      if (G.newBest) S.times[key] = { ms, misses: G.misses, hints: G.hintsUsed, day: todayKey(), plays: (prev ? prev.plays || 1 : 0) + 1, arrows: G.arrows.length };
+      else { prev.plays = (prev.plays || 1) + 1; prev.arrows = G.arrows.length; }
     } else if (!G.replay && !S.daily[G.day]) {
       S.daily[G.day] = { ms: Math.round(G.elapsed), misses: G.misses, diff: G.diff };
       S.bestStreak = Math.max(S.bestStreak || 0, currentStreak());
@@ -1744,20 +1759,70 @@ function generateFrom(p, seedBase) {
   function closeStats() { $('#statsSheet').hidden = true; timerStart(); }
 
   const CHEVRON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
+  // Sort for the best-times list. Every sort starts best-first; tapping it again reverses it.
+  // Ties fall back to the other measures, so equal hint counts still come out in a sensible order.
+  const SORTS = {
+    level:   { asc: 'Level 1 first', desc: 'Highest level first', cmp: (a, b) => a.level - b.level },
+    time:    { asc: 'Fastest first', desc: 'Slowest first', cmp: (a, b) => a.ms - b.ms || a.misses - b.misses || a.hints - b.hints || a.level - b.level },
+    hints:   { asc: 'Fewest hints first', desc: 'Most hints first', cmp: (a, b) => a.hints - b.hints || a.misses - b.misses || a.ms - b.ms || a.level - b.level },
+    misses:  { asc: 'Fewest misses first', desc: 'Most misses first', cmp: (a, b) => a.misses - b.misses || a.hints - b.hints || a.ms - b.ms || a.level - b.level },
+    overall: { asc: 'Best overall first', desc: 'Worst overall first', cmp: (a, b) => a.score - b.score || a.level - b.level }
+  };
+  let timesDiff = 'standard';
+  let timesSort = (() => { const t = store.get('timesSort', null); return t && SORTS[t.key] && (t.dir === 'asc' || t.dir === 'desc') ? t : { key: 'level', dir: 'asc' }; })();
+  // Overall blends all three, fairly across board sizes: seconds per arrow,
+  // made 10% worse for each miss and 20% worse for each hint. Lower is better.
+  const overallScore = (r) => (r.ms / 1000 / Math.max(1, r.arrows)) * (1 + 0.1 * r.misses + 0.2 * r.hints);
+  function arrowCount(level, d, rec) {
+    if (!rec.arrows) { rec.arrows = generateLevel(level, d).arrows.length; saveStats(); } // older records, counted once
+    return rec.arrows;
+  }
+
   function renderTimes(d) {
+    timesDiff = d;
     for (const b of document.querySelectorAll('#timesSeg button')) b.setAttribute('aria-pressed', String(b.dataset.tdiff === d));
-    const rows = Object.keys(S.times).filter((k) => k.startsWith(d + ':'))
-      .map((k) => Object.assign({ level: +k.split(':')[1] }, S.times[k])).sort((a, b) => a.level - b.level);
+    const keys = Object.keys(S.times).filter((k) => k.startsWith(d + ':'));
+    const rows = keys.map((k) => {
+      const rec = S.times[k], level = +k.split(':')[1];
+      return Object.assign({ level }, rec, { misses: rec.misses || 0, hints: rec.hints || 0 });
+    });
     const list = $('#timesList');
+    $('#sortBox').hidden = rows.length < 2;
     if (!rows.length) { list.innerHTML = `<p class="foot-note">No ${cap(d)} times yet. Clear a level and its time shows up here.</p>`; return; }
+
+    const { key, dir } = timesSort, overall = key === 'overall';
+    if (overall) for (const r of rows) { r.arrows = arrowCount(r.level, d, S.times[`${d}:${r.level}`]); r.score = overallScore(r); }
+    const cmp = SORTS[key].cmp;
+    rows.sort(dir === 'asc' ? cmp : (a, b) => cmp(b, a));
+
+    for (const c of document.querySelectorAll('#sortChips .chip')) {
+      const on = c.dataset.sort === key;
+      c.setAttribute('aria-pressed', String(on));
+      const name = c.dataset.sort.charAt(0).toUpperCase() + c.dataset.sort.slice(1);
+      c.innerHTML = on ? `${name}<svg viewBox="0 0 24 24" aria-hidden="true">${dir === 'asc' ? '<path d="M12 19V5"/><path d="M6 11l6-6 6 6"/>' : '<path d="M12 5v14"/><path d="M6 13l6 6 6-6"/>'}</svg>` : name;
+      c.setAttribute('aria-label', on ? `${name}, ${SORTS[key][dir]}. Tap to reverse.` : `Sort by ${name.toLowerCase()}`);
+    }
+    const pick = SORTS[key];
+    $('#sortNote').textContent = `${pick[dir]}. Tap ${key === 'level' ? 'Level' : key.charAt(0).toUpperCase() + key.slice(1)} again for ${pick[dir === 'asc' ? 'desc' : 'asc'].charAt(0).toLowerCase() + pick[dir === 'asc' ? 'desc' : 'asc'].slice(1)}.` +
+      (overall ? ' Overall is your time per arrow, made 10% worse for each miss and 20% worse for each hint, so big and small boards compare fairly.' : '');
+
     list.innerHTML = rows.map((r) => {
       const sh = levelParams(r.level, d).shape;
       const sub = `${sh ? sh.name + ' · ' : ''}${missText(r.misses)}${hintText(r.hints)}${r.plays > 1 ? ` · ${r.plays} clears` : ''}`;
+      const small = overall ? `${r.score.toFixed(2)}s per arrow` : (r.day ? prettyDay(r.day) : '');
       return `<button type="button" class="time-row" data-level="${r.level}" data-diff="${d}" aria-label="Replay level ${r.level}, best ${fmtBest(r.ms)}">` +
         `<span><span class="lv">Level ${r.level}</span><span class="sub">${sub}</span></span>` +
-        `<span class="t">${fmtBest(r.ms)}<small>${r.day ? prettyDay(r.day) : ''}</small></span>${CHEVRON}</button>`;
+        `<span class="t">${fmtBest(r.ms)}<small>${small}</small></span>${CHEVRON}</button>`;
     }).join('');
   }
+  $('#sortChips').addEventListener('click', (e) => {
+    const c = e.target.closest('.chip');
+    if (!c) return;
+    const k = c.dataset.sort;
+    timesSort = k === timesSort.key ? { key: k, dir: timesSort.dir === 'asc' ? 'desc' : 'asc' } : { key: k, dir: 'asc' };
+    store.set('timesSort', timesSort);
+    renderTimes(timesDiff);
+  });
   for (const b of document.querySelectorAll('#timesSeg button')) b.addEventListener('click', () => renderTimes(b.dataset.tdiff));
   $('#timesList').addEventListener('click', (e) => {
     const row = e.target.closest('.time-row');

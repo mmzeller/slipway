@@ -2,6 +2,9 @@
 
 The version shows at the bottom of the Settings screen in the app.
 
+## 1.6.0 · Oct 13, 2026
+- Sort the best-times list by level, time, hints, misses, or Overall, which blends all three. Tap the active sort again to reverse it
+
 ## 1.5.1 · Oct 12, 2026
 - Fixed: on narrow screens (Display Zoom, iPhone mini and SE) the hint squares made the page wider than the screen and cut off the right edge
 - Narrow screens get tighter button spacing, and at the narrowest the button icons are dropped so the labels fit
