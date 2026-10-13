@@ -2,6 +2,11 @@
 
 The version shows at the bottom of the Settings screen in the app.
 
+## 1.6.1 · Oct 13, 2026
+- A strip below the board catches near-misses and sends them to the nearest arrow instead of the buttons
+- Restart, Hint and Settings ignore taps that land right after an arrow tap
+- Restart asks for a second tap while a board is in progress
+
 ## 1.6.0 · Oct 13, 2026
 - Sort the best-times list by level, time, hints, misses, or Overall, which blends all three. Tap the active sort again to reverse it
 

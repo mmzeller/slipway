@@ -92,7 +92,8 @@ header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
 
 /* Board */
 .stage{position:relative;min-height:0;display:grid;place-items:center;z-index:2;overflow:hidden;touch-action:none;border-radius:12px}
-#board{position:absolute;inset:0;width:100%;height:100%;display:block;overflow:visible}
+/* The bottom 18px of the stage is a catch strip: taps there go to the nearest arrow, never to the buttons below */
+#board{position:absolute;top:0;left:0;width:100%;height:calc(100% - 18px);display:block;overflow:visible}
 .stage.panning{cursor:grabbing}
 /* Fit board lives beside the timer, above the board, so it never covers arrows */
 .clock-row{display:flex;align-items:center;justify-content:flex-end;gap:10px;min-height:28px}
@@ -138,7 +139,7 @@ footer{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:1
 footer .btn{min-width:0;overflow:hidden;white-space:nowrap}
 button{font:inherit;color:inherit}
 .btn{
-  height:50px;border-radius:14px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);
+  height:46px;border-radius:14px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);
   font-weight:700;font-size:15px;display:inline-flex;align-items:center;justify-content:center;gap:8px;
   cursor:pointer;padding-inline:16px;transition:transform .1s,border-color .15s;
 }
@@ -146,6 +147,7 @@ button{font:inherit;color:inherit}
 .btn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
 .btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .btn.icon{width:50px;padding:0}
+.btn.armed{border-color:var(--danger);color:var(--danger)}
 .btn:disabled{opacity:.45;cursor:default}
 .btn:disabled:active{transform:none}
 .pips{display:inline-flex;gap:3px;margin-left:2px}
@@ -290,7 +292,7 @@ button{font:inherit;color:inherit}
     <footer>
       <button class="btn" id="restartBtn" type="button">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.6-5.9"/><path d="M4 4v5h5"/></svg>
-        Restart
+        <span id="restartLabel">Restart</span>
       </button>
       <button class="btn primary" id="hintBtn" type="button">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>
@@ -858,7 +860,7 @@ function generateFrom(p, seedBase) {
 <script>
 (() => {
   // Bump with every release so the installed app shows which version it is running
-  const APP_VERSION = '1.6.0';
+  const APP_VERSION = '1.6.1';
   const APP_BUILD = '2026-10-07';
   const $ = (s) => document.querySelector(s);
   {
@@ -1021,6 +1023,7 @@ function generateFrom(p, seedBase) {
   // spec: { mode: 'levels', level } or { mode: 'daily', day: 'YYYY-MM-DD', replay }
   function loadBoard(spec, restore) {
     timerStop();
+    disarmRestart();
     anims.clear();
     const level = Math.max(1, Math.floor(spec.level) || 1);
     const lv = spec.mode === 'daily' ? generateDaily(numOf(spec.day), diff) : generateLevel(level, diff);
@@ -1059,6 +1062,7 @@ function generateFrom(p, seedBase) {
 
   // Brings back a board you left on the other tab, exactly as it was
   function resumeBoard(saved) {
+    disarmRestart();
     G = saved;
     anims.clear();
     for (const a of G.arrows) { a.busy = false; a.bumpAnim = null; }
@@ -1148,6 +1152,7 @@ function generateFrom(p, seedBase) {
       }
     }
     $('#meta').textContent = `${G.shape ? G.shape + ' · ' : ''}${G.W} × ${G.H} · ${G.left} ${G.left === 1 ? 'arrow' : 'arrows'} left`;
+    $('#clock').textContent = fmtTime(elapsedMs());
     syncBestTag();
     updateHintBtn();
     const tip = $('#tip');
@@ -1413,7 +1418,7 @@ function generateFrom(p, seedBase) {
   // The window is drawn through the SVG viewBox, so the board never spills past its frame.
   // Z.s = zoom (1 = whole board), (Z.cx, Z.cy) = board point, in cells, at the centre of the view.
   const Z = { s: 1, cx: null, cy: null, fz: 0, vx: 0, vy: 0 };
-  function stageBox() { const r = stage.getBoundingClientRect(); return { left: r.left, top: r.top, w: r.width, h: r.height }; }
+  function stageBox() { const r = svg.getBoundingClientRect(); return { left: r.left, top: r.top, w: r.width, h: r.height }; } // the drawn board area, above the catch strip
   const baseFit = (b) => Math.min(b.w / G.W, b.h / G.H, 64);                 // px per cell at zoom 1
   const maxZoom = (b) => Math.min(6, Math.max(1, 46 / baseFit(b || stageBox()))); // up to about 46px cells
   function centreRange(b, s) {
@@ -1547,8 +1552,12 @@ function generateFrom(p, seedBase) {
     const m = mid(), g = toBoard(m.x, m.y);
     gesture = { type: 'pinch', d0: m.d, s0: Z.s, g, max: maxZoom(), last: m };
   }
+  let lastBoardTouch = -1e9;
+  // Buttons ignore taps that land right after an arrow tap: that's a finger slipping off the board, not a choice
+  const justTouchedBoard = () => performance.now() - lastBoardTouch < 450;
   stage.addEventListener('pointerdown', (e) => {
     if (!G || e.target.closest('.overlay, .zoom-chip')) return;
+    lastBoardTouch = performance.now();
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     const caught = !!viewAnim; // touching a gliding board just stops it, like iOS
     stopViewAnim();
@@ -1591,6 +1600,7 @@ function generateFrom(p, seedBase) {
   });
   function endPointer(e, cancelled) {
     if (!ptrs.has(e.pointerId)) return;
+    lastBoardTouch = performance.now();
     ptrs.delete(e.pointerId);
     if (!gesture) return;
     if (ptrs.size === 1) {
@@ -1636,8 +1646,28 @@ function generateFrom(p, seedBase) {
   document.addEventListener('touchmove', (e) => { if (e.touches.length > 1 && !pageZoomed()) e.preventDefault(); }, { passive: false });
   document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });
 
-  $('#restartBtn').addEventListener('click', () => { if (G.mode === 'daily' && S.daily[G.day] && !G.replay) { openDaily(); return; } restartBoard(); });
-  $('#hintBtn').addEventListener('click', hint);
+  let restartArmed = 0;
+  function disarmRestart() {
+    clearTimeout(restartArmed); restartArmed = 0;
+    $('#restartLabel').textContent = 'Restart';
+    $('#restartBtn').classList.remove('armed');
+    $('#restartBtn').setAttribute('aria-label', 'Restart this board');
+  }
+  $('#restartBtn').addEventListener('click', () => {
+    if (justTouchedBoard()) return;
+    const inProgress = G && G.started && !G.over;
+    if (inProgress && !restartArmed) {
+      $('#restartLabel').textContent = 'Tap again';
+      $('#restartBtn').classList.add('armed');
+      $('#restartBtn').setAttribute('aria-label', 'Tap again to restart and lose this board\'s progress');
+      restartArmed = setTimeout(disarmRestart, 3000);
+      return;
+    }
+    disarmRestart();
+    if (G.mode === 'daily' && S.daily[G.day] && !G.replay) { openDaily(); return; }
+    restartBoard();
+  });
+  $('#hintBtn').addEventListener('click', () => { if (!justTouchedBoard()) hint(); });
   $('#nextBtn').addEventListener('click', () => winAction && winAction());
   $('#winAltBtn').addEventListener('click', () => winAltAction && winAltAction());
   $('#retryBtn').addEventListener('click', restartBoard);
@@ -1687,7 +1717,7 @@ function generateFrom(p, seedBase) {
   function closeSheet() { $('#sheet').hidden = true; disarmReset(); timerStart(); }
   for (const b of document.querySelectorAll('#diffSeg button')) b.addEventListener('click', () => setDifficulty(b.dataset.diff));
 
-  $('#settingsBtn').addEventListener('click', openSheet);
+  $('#settingsBtn').addEventListener('click', () => { if (!justTouchedBoard()) openSheet(); });
   $('#closeSheet').addEventListener('click', closeSheet);
   $('#sheet').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeSheet(); });
   document.addEventListener('keydown', (e) => {
