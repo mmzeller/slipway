@@ -2,6 +2,10 @@
 
 The version shows at the bottom of the Settings screen in the app.
 
+## 1.5.1 · Oct 12, 2026
+- Fixed: on narrow screens (Display Zoom, iPhone mini and SE) the hint squares made the page wider than the screen and cut off the right edge
+- Narrow screens get tighter button spacing, and at the narrowest the button icons are dropped so the labels fit
+
 ## 1.5.0 · Oct 12, 2026
 - Best times: your fastest clear of every level is saved per difficulty, shown beside the hearts while you play, and listed in Stats, where tapping a level replays it
 - The win card says whether you beat your best, and after a replay offers a quick way back to your furthest level

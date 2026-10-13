@@ -56,7 +56,7 @@ body{
 }
 .app{
   height:100%;max-width:620px;margin:0 auto;padding-inline:16px;padding-block:14px 12px;
-  display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;gap:12px;
+  display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;grid-template-columns:minmax(0,1fr);gap:12px;
 }
 
 /* Top bar: wordmark, mode tabs, stats */
@@ -75,7 +75,7 @@ header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
 .lvl-label{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:700}
 .lvl-num{font-family:var(--font-display);font-size:clamp(44px,12.5vw,58px);line-height:.88;margin-top:6px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .status{display:flex;flex-direction:column;align-items:flex-end;gap:6px;padding-bottom:2px;min-width:0;text-align:right}
-.status-top{display:flex;align-items:center;justify-content:flex-end;gap:12px;min-height:20px}
+.status-top{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:4px 12px;min-height:20px}
 .best-tag{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .best-tag b{color:var(--ink);font-weight:700;transition:color .3s}
 .best-tag.behind b{color:var(--danger)}
@@ -134,7 +134,8 @@ header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
 /* Bottom controls */
 .bottom{display:grid;gap:10px}
 .tip{margin:0;font-size:14px;line-height:1.45;color:var(--muted);text-align:center;text-wrap:balance}
-footer{display:grid;grid-template-columns:1fr 1fr auto;gap:10px}
+footer{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:10px}
+footer .btn{min-width:0;overflow:hidden;white-space:nowrap}
 button{font:inherit;color:inherit}
 .btn{
   height:50px;border-radius:14px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);
@@ -198,6 +199,20 @@ button{font:inherit;color:inherit}
 .sheet-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
 .danger-text{color:var(--danger)}
 .version{margin:2px 0 0;text-align:center;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;-webkit-user-select:text;user-select:text}
+
+@media (max-width: 380px){
+  footer{gap:8px}
+  footer .btn{padding-inline:12px;gap:6px}
+  .pips{gap:2px}
+  .pips i{width:7px;height:7px}
+  .seg button{padding-inline:11px}
+  .top-right{gap:6px}
+}
+@media (max-width: 340px){
+  footer .btn:not(.icon) > svg{display:none}
+  .brand{font-size:20px}
+  .zoom-chip{padding-inline:9px}
+}
 
 @media (prefers-reduced-motion: reduce){
   .arrow.hinted{animation:none}
@@ -828,7 +843,7 @@ function generateFrom(p, seedBase) {
 <script>
 (() => {
   // Bump with every release so the installed app shows which version it is running
-  const APP_VERSION = '1.5.0';
+  const APP_VERSION = '1.5.1';
   const APP_BUILD = '2026-10-07';
   const $ = (s) => document.querySelector(s);
   {
@@ -1340,7 +1355,7 @@ function generateFrom(p, seedBase) {
     const left = Math.max(0, lim - G.hintsUsed), out = left === 0 && G.hintId < 0;
     pips.hidden = false;
     pips.innerHTML = Array.from({ length: lim }, (_, i) => `<i class="${i < left ? 'on' : ''}"></i>`).join('');
-    $('#hintLabel').textContent = out ? 'No hints' : 'Hint';
+    $('#hintLabel').textContent = 'Hint';
     btn.disabled = out;
     btn.setAttribute('aria-label', out ? 'No hints left on this board' : `Hint, ${left} of ${lim} left`);
   }
