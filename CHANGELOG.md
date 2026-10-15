@@ -2,6 +2,9 @@
 
 The version shows at the bottom of the Settings screen in the app.
 
+## 1.7.1 · Oct 15, 2026
+- The date beside the version in Settings now updates with every release (it was stuck on Oct 7)
+
 ## 1.7.0 · Oct 15, 2026
 - Taps go to the arrow whose drawn line is nearest your finger
 - A tap right between two arrows does nothing and doesn't count as a miss; both arrows blink so you can tap again (Settings → Ignore unclear taps)
