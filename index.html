@@ -112,6 +112,14 @@ header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
 .arrow.hinted path{fill:var(--accent);stroke:var(--accent)}
 .arrow.hinted{animation:pulse 1s ease-in-out 3}
 @keyframes pulse{50%{opacity:.4}}
+.halo polyline{fill:none;stroke:var(--accent);stroke-linecap:round;stroke-linejoin:round;opacity:.24}
+.halo path{fill:var(--accent);stroke:var(--accent);stroke-linejoin:round;opacity:.24}
+.halo.unclear polyline,.halo.unclear path{stroke:var(--muted);fill:var(--muted);opacity:.4}
+.halo.unclear.flash{animation:unclear .55s ease-out}
+@keyframes unclear{0%,100%{opacity:1}25%{opacity:.25}55%{opacity:1}75%{opacity:.35}}
+.halo.fade{opacity:0;transition:opacity .25s}
+.toast{position:absolute;left:50%;bottom:30px;transform:translateX(-50%);z-index:4;width:max-content;max-width:calc(100% - 24px);background:var(--ink);color:var(--paper);font-size:13px;font-weight:700;line-height:1.35;padding:8px 14px;border-radius:999px;pointer-events:none;box-shadow:0 6px 16px var(--shadow);text-align:center;opacity:0;transition:opacity .2s}
+.toast.show{opacity:1}
 .trail{stroke:var(--accent);stroke-linecap:round;fill:none;opacity:0;animation:trail .7s ease-out forwards}
 @keyframes trail{0%{opacity:.3}100%{opacity:0}}
 
@@ -222,7 +230,7 @@ button{font:inherit;color:inherit}
 }
 
 @media (prefers-reduced-motion: reduce){
-  .arrow.hinted{animation:none}
+  .arrow.hinted,.halo.unclear.flash{animation:none}
   .overlay,.sheet-back,.heart.pop{animation:none}
 }
 </style>
@@ -260,6 +268,7 @@ button{font:inherit;color:inherit}
 
   <main class="stage" id="stage">
     <svg id="board" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMinYMin meet" role="application" aria-label="Puzzle board. Tap an arrow to release it."></svg>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <div class="overlay" id="winOv" hidden>
       <div class="card" role="dialog" aria-labelledby="winTitle">
@@ -325,6 +334,13 @@ button{font:inherit;color:inherit}
         <div class="row-sub">No hearts and unlimited hints. Blocked arrows still turn red and wait their turn.</div>
       </div>
       <button class="switch" id="relaxedSw" type="button" aria-pressed="false" aria-label="Relaxed mode"></button>
+    </div>
+    <div class="row">
+      <div class="row-text">
+        <div class="row-title">Ignore unclear taps</div>
+        <div class="row-sub">A tap that lands right between two arrows does nothing, so it can't cost you a miss. Tap again closer to the one you want.</div>
+      </div>
+      <button class="switch" id="carefulSw" type="button" aria-pressed="true" aria-label="Ignore unclear taps"></button>
     </div>
     <div class="row">
       <div class="row-text">
@@ -860,7 +876,7 @@ function generateFrom(p, seedBase) {
 <script>
 (() => {
   // Bump with every release so the installed app shows which version it is running
-  const APP_VERSION = '1.6.1';
+  const APP_VERSION = '1.7.0';
   const APP_BUILD = '2026-10-07';
   const $ = (s) => document.querySelector(s);
   {
@@ -877,7 +893,7 @@ function generateFrom(p, seedBase) {
     get(k, d) { try { const v = localStorage.getItem('slipway.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem('slipway.' + k, JSON.stringify(v)); } catch (e) {} }
   };
-  const settings = { relaxed: !!store.get('relaxed', false), sound: store.get('sound', true) !== false };
+  const settings = { relaxed: !!store.get('relaxed', false), sound: store.get('sound', true) !== false, careful: store.get('careful', true) !== false };
   const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const svg = $('#board'), stage = $('#stage');
@@ -1113,6 +1129,8 @@ function generateFrom(p, seedBase) {
     for (let r = 0; r < G.H; r++) for (let c = 0; c < G.W; c++) if (G.mask[r * G.W + c]) dd += `M${c + 0.44} ${r + 0.5}a.06 .06 0 1 0 .12 0a.06 .06 0 1 0 -.12 0`;
     el('path', { class: 'dot', d: dd }, svg);
     G.trails = el('g', {}, svg);
+    halo = null;
+    G.haloLayer = el('g', {}, svg);
     const ag = el('g', {}, svg);
     for (const a of G.arrows) {
       if (a.removed) continue;
@@ -1521,24 +1539,77 @@ function generateFrom(p, seedBase) {
   }
   function noteZoomed() { if (Z.s > 1.05 && !store.get('zoomTipDone', false)) store.set('zoomTipDone', true); } // tip clears on the next board, so the layout never shifts mid-pinch
 
-  // Finds the arrow nearest the touch point, so small cells stay easy to hit
-  function hitTest(x, y) {
-    if (!G || G.over) return;
-    if (!viewAnim) settleView();
-    if (!Z.fz) return;
-    const p = toBoard(x, y), gx = p.x, gy = p.y;
-    const cellScreen = Z.fz;
-    const radius = Math.max(0.72, 13 / cellScreen);
+  // ---------- Tap targeting ----------
+  // A tap goes to the arrow whose drawn line is nearest the finger (body through cell centres, plus the head's tip).
+  function inkDist(a, gx, gy) {
+    const pts = a.cells.map(([r, c]) => [c + 0.5, r + 0.5]);
+    const [hr, hc] = a.cells[a.cells.length - 1];
+    pts.push([hc + 0.5 + DC[a.dir] * 0.42, hr + 0.5 + DR[a.dir] * 0.42]);
+    let d = Infinity;
+    for (let i = 1; i < pts.length; i++) {
+      const [x1, y1] = pts[i - 1], [x2, y2] = pts[i], dx = x2 - x1, dy = y2 - y1;
+      const t = Math.max(0, Math.min(1, ((gx - x1) * dx + (gy - y1) * dy) / (dx * dx + dy * dy)));
+      d = Math.min(d, Math.hypot(gx - (x1 + t * dx), gy - (y1 + t * dy)));
+    }
+    return d;
+  }
+  // Returns the arrow under a touch, and whether the touch sits so close to the line between two arrows
+  // that it's a coin flip. That call depends only on where the finger landed, never on which arrow is free.
+  function pickArrow(x, y) {
+    if (!G || G.over || !Z.fz) return null;
+    const p = toBoard(x, y), gx = p.x, gy = p.y, px = Z.fz;
+    const radius = Math.max(0.75, 14 / px);
     const R = Math.ceil(radius) + 1, c0 = Math.floor(gx), r0 = Math.floor(gy);
-    let best = -1, bd = Infinity;
+    const ids = new Set();
     for (let r = r0 - R; r <= r0 + R; r++) for (let c = c0 - R; c <= c0 + R; c++) {
       if (r < 0 || r >= G.H || c < 0 || c >= G.W) continue;
       const id = G.occ[r * G.W + c];
-      if (id < 0) continue;
-      const d = Math.hypot(c + 0.5 - gx, r + 0.5 - gy);
-      if (d < bd) { bd = d; best = id; }
+      if (id >= 0) ids.add(id);
     }
-    if (best >= 0 && bd <= radius) tap(G.arrows[best]);
+    const ranked = [...ids].map((id) => ({ id, d: inkDist(G.arrows[id], gx, gy) })).sort((a, b) => a.d - b.d);
+    if (!ranked.length || ranked[0].d > radius) return null;
+    const second = ranked[1];
+    const unclear = settings.careful && !!second && second.d - ranked[0].d < Math.min(0.3, 7 / px);
+    return { id: ranked[0].id, other: second ? second.id : -1, unclear };
+  }
+
+  // Soft glow on the arrow under your finger while you touch, so a wrong pick can be cancelled by sliding away
+  let halo = null;
+  function clearHalo(fade) {
+    if (!halo) return;
+    const h = halo; halo = null;
+    if (fade && !reduceMotion) { h.classList.add('fade'); setTimeout(() => h.remove(), 260); } else h.remove();
+  }
+  function showHalo(ids, unclear) {
+    clearHalo();
+    if (!G || !G.haloLayer) return;
+    halo = el('g', { class: 'halo' + (unclear ? ' unclear' : '') }, G.haloLayer);
+    for (const id of ids) {
+      const a = G.arrows[id];
+      if (!a || a.removed || !a.poly) continue;
+      el('polyline', { points: a.poly.getAttribute('points'), 'stroke-width': 0.62 }, halo);
+      el('path', { d: HEAD, transform: a.head.getAttribute('transform'), 'stroke-width': 0.34 }, halo);
+    }
+  }
+  let toastTimer = 0;
+  function toast(msg) {
+    const t = $('#toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+  }
+  function finishTap(pick) {
+    if (!pick) { clearHalo(); return; }
+    const a = G.arrows[pick.id];
+    if (pick.unclear) {
+      // Both candidates blink; nothing moves and nothing counts
+      showHalo([pick.id, pick.other], true);
+      const h = halo; if (h) { h.classList.add('flash'); setTimeout(() => { if (halo === h) clearHalo(true); }, 650); }
+      const n = store.get('unclearTips', 0);
+      if (n < 5) { store.set('unclearTips', n + 1); toast("Right between two arrows, so it didn't count. Tap again."); }
+      return;
+    }
+    clearHalo(true);
+    if (a && !a.removed) tap(a);
   }
 
   // ---------- Touch gestures on the board: tap, drag, pinch ----------
@@ -1564,8 +1635,13 @@ function generateFrom(p, seedBase) {
     if (commitRaf) { cancelAnimationFrame(commitRaf); commitRaf = 0; commitView(); }
     ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
     try { stage.setPointerCapture(e.pointerId); } catch (err) {}
-    if (ptrs.size === 1) startPan(e.clientX, e.clientY, caught);
-    else if (ptrs.size === 2) startPinch();
+    if (ptrs.size === 1) {
+      startPan(e.clientX, e.clientY, caught);
+      if (!caught) {
+        gesture.pick = pickArrow(e.clientX, e.clientY);
+        if (gesture.pick) showHalo(gesture.pick.unclear ? [gesture.pick.id, gesture.pick.other] : [gesture.pick.id], gesture.pick.unclear);
+      }
+    } else if (ptrs.size === 2) { clearHalo(); startPinch(); }
     e.preventDefault();
   });
   stage.addEventListener('pointermove', (e) => {
@@ -1585,7 +1661,7 @@ function generateFrom(p, seedBase) {
       noteZoomed();
     } else if (gesture.type === 'tap' || gesture.type === 'pan') {
       const dx = e.clientX - gesture.x0, dy = e.clientY - gesture.y0;
-      if (gesture.type === 'tap' && Math.hypot(dx, dy) > 8) gesture.type = 'pan';
+      if (gesture.type === 'tap' && Math.hypot(dx, dy) > 8) { gesture.type = 'pan'; clearHalo(true); } // slid away: the tap is cancelled
       if (gesture.type !== 'pan') return;
       const R = centreRange(b, Z.s);
       const rx = gesture.cx0 - dx / gesture.fz, ry = gesture.cy0 - dy / gesture.fz;
@@ -1602,7 +1678,7 @@ function generateFrom(p, seedBase) {
     if (!ptrs.has(e.pointerId)) return;
     lastBoardTouch = performance.now();
     ptrs.delete(e.pointerId);
-    if (!gesture) return;
+    if (!gesture) { clearHalo(); return; }
     if (ptrs.size === 1) {
       // one finger lifted mid-pinch: carry on as a drag from here, never as a tap
       const p = [...ptrs.values()][0];
@@ -1615,7 +1691,7 @@ function generateFrom(p, seedBase) {
     gesture = null;
     stage.classList.remove('panning');
     if (commitRaf) { cancelAnimationFrame(commitRaf); commitRaf = 0; commitView(); }
-    if (g.type === 'tap') { if (!cancelled && !g.caught) hitTest(e.clientX, e.clientY); settleView(); return; }
+    if (g.type === 'tap') { if (!cancelled && !g.caught) finishTap(g.pick); else clearHalo(); settleView(); return; }
     if (g.type === 'pinch') { animateView(restingView(g.last), 'spring'); return; }
     // drag released: keep gliding if the finger was still moving, then ease to a stop
     let glide = null;
@@ -1709,6 +1785,7 @@ function generateFrom(p, seedBase) {
     pickLevel = G.mode === 'levels' ? G.level : store.get('level', 1);
     $('#relaxedSw').setAttribute('aria-pressed', String(settings.relaxed));
     $('#soundSw').setAttribute('aria-pressed', String(settings.sound));
+    $('#carefulSw').setAttribute('aria-pressed', String(settings.careful));
     disarmReset();
     syncStepper();
     $('#sheet').hidden = false;
@@ -1728,6 +1805,10 @@ function generateFrom(p, seedBase) {
   $('#relaxedSw').addEventListener('click', () => {
     setRelaxed(!settings.relaxed);
     if (G && settings.relaxed && G.over && G.left > 0) restartBoard();
+  });
+  $('#carefulSw').addEventListener('click', () => {
+    settings.careful = !settings.careful; store.set('careful', settings.careful);
+    $('#carefulSw').setAttribute('aria-pressed', String(settings.careful));
   });
   $('#soundSw').addEventListener('click', () => {
     settings.sound = !settings.sound; store.set('sound', settings.sound);

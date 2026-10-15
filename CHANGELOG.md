@@ -2,6 +2,11 @@
 
 The version shows at the bottom of the Settings screen in the app.
 
+## 1.7.0 · Oct 15, 2026
+- Taps go to the arrow whose drawn line is nearest your finger
+- A tap right between two arrows does nothing and doesn't count as a miss; both arrows blink so you can tap again (Settings → Ignore unclear taps)
+- A soft glow shows which arrow is under your finger; slide away before lifting to cancel
+
 ## 1.6.1 · Oct 13, 2026
 - A strip below the board catches near-misses and sends them to the nearest arrow instead of the buttons
 - Restart, Hint and Settings ignore taps that land right after an arrow tap
