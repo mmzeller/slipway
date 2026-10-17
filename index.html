@@ -337,10 +337,10 @@ button{font:inherit;color:inherit}
     </div>
     <div class="row">
       <div class="row-text">
-        <div class="row-title">Ignore unclear taps</div>
-        <div class="row-sub">A tap that lands right between two arrows does nothing, so it can't cost you a miss. Tap again closer to the one you want.</div>
+        <div class="row-title">Tap assist</div>
+        <div class="row-sub">Glows the arrow under your finger, and ignores a tap that lands right between two arrows so it can't cost you a miss. Turn off for plain taps.</div>
       </div>
-      <button class="switch" id="carefulSw" type="button" aria-pressed="true" aria-label="Ignore unclear taps"></button>
+      <button class="switch" id="carefulSw" type="button" aria-pressed="true" aria-label="Tap assist"></button>
     </div>
     <div class="row">
       <div class="row-text">
@@ -876,8 +876,8 @@ function generateFrom(p, seedBase) {
 <script>
 (() => {
   // Bump with every release so the installed app shows which version it is running
-  const APP_VERSION = '1.7.1';
-  const APP_BUILD = '2026-10-15';
+  const APP_VERSION = '1.7.2';
+  const APP_BUILD = '2026-10-16';
   const $ = (s) => document.querySelector(s);
   {
     const [y, m, d] = APP_BUILD.split('-').map(Number);
@@ -1484,9 +1484,10 @@ function generateFrom(p, seedBase) {
   const toBoard = (x, y) => { const b = stageBox(); return { x: Z.vx + (x - b.left) / Z.fz, y: Z.vy + (y - b.top) / Z.fz }; };
 
   // Glides the view to a target with an iOS-style exponential slow-down
-  let viewAnim = 0;
+  let viewAnim = 0, viewAnimMode = '';
   function stopViewAnim() { if (viewAnim) { cancelAnimationFrame(viewAnim); viewAnim = 0; } }
   function animateView(target, mode) {
+    viewAnimMode = mode;
     stopViewAnim();
     if (reduceMotion) { Object.assign(Z, target); commitView(); return; }
     const from = { s: Z.s, cx: Z.cx, cy: Z.cy };
@@ -1630,7 +1631,7 @@ function generateFrom(p, seedBase) {
     if (!G || e.target.closest('.overlay, .zoom-chip')) return;
     lastBoardTouch = performance.now();
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-    const caught = !!viewAnim; // touching a gliding board just stops it, like iOS
+    const caught = !!viewAnim && viewAnimMode === 'glide'; // touching a gliding board just stops it, like iOS
     stopViewAnim();
     if (commitRaf) { cancelAnimationFrame(commitRaf); commitRaf = 0; commitView(); }
     ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -1639,7 +1640,7 @@ function generateFrom(p, seedBase) {
       startPan(e.clientX, e.clientY, caught);
       if (!caught) {
         gesture.pick = pickArrow(e.clientX, e.clientY);
-        if (gesture.pick) showHalo(gesture.pick.unclear ? [gesture.pick.id, gesture.pick.other] : [gesture.pick.id], gesture.pick.unclear);
+        if (gesture.pick && settings.careful) showHalo(gesture.pick.unclear ? [gesture.pick.id, gesture.pick.other] : [gesture.pick.id], gesture.pick.unclear);
       }
     } else if (ptrs.size === 2) { clearHalo(); startPinch(); }
     e.preventDefault();
@@ -1662,7 +1663,7 @@ function generateFrom(p, seedBase) {
     } else if (gesture.type === 'tap' || gesture.type === 'pan') {
       const dx = e.clientX - gesture.x0, dy = e.clientY - gesture.y0;
       if (gesture.type === 'tap' && Math.hypot(dx, dy) > 8) { gesture.type = 'pan'; clearHalo(true); } // slid away: the tap is cancelled
-      if (gesture.type !== 'pan') return;
+      if (gesture.type !== 'pan' || Z.s <= 1.01) return;
       const R = centreRange(b, Z.s);
       const rx = gesture.cx0 - dx / gesture.fz, ry = gesture.cy0 - dy / gesture.fz;
       Z.cx = band(rx, R.x[0], R.x[1], b.w / Z.fz);
@@ -1809,6 +1810,7 @@ function generateFrom(p, seedBase) {
   $('#carefulSw').addEventListener('click', () => {
     settings.careful = !settings.careful; store.set('careful', settings.careful);
     $('#carefulSw').setAttribute('aria-pressed', String(settings.careful));
+    if (!settings.careful) clearHalo();
   });
   $('#soundSw').addEventListener('click', () => {
     settings.sound = !settings.sound; store.set('sound', settings.sound);

@@ -2,6 +2,10 @@
 
 The version shows at the bottom of the Settings screen in the app.
 
+## 1.7.2 · Oct 16, 2026
+- One Settings switch, Tap assist, now turns all the fat-finger help on or off: the glow under your finger and ignoring taps between two arrows
+- Fixed: sliding your finger away to cancel a tap could make the very next tap do nothing
+
 ## 1.7.1 · Oct 15, 2026
 - The date beside the version in Settings now updates with every release (it was stuck on Oct 7)
 
