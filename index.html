@@ -190,6 +190,18 @@ button{font:inherit;color:inherit}
 }
 .sec-label{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:14px 0 8px}
 .tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tile.wide{grid-column:1 / -1}
+.tile.wide span.why{margin-top:6px;line-height:1.4}
+.score-line{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:2px 0 2px}
+.score-line b{font-family:var(--font-display);font-weight:400;font-size:40px;line-height:1;font-variant-numeric:tabular-nums;color:var(--ink)}
+.score-line span{font-size:14px;color:var(--muted);font-weight:700}
+.score-line .high{color:var(--accent)}
+.sec-toggle{display:flex;align-items:center;gap:8px;width:100%;margin:14px 0 8px;padding:0;border:0;background:transparent;color:var(--muted);font:inherit;cursor:pointer;text-align:left}
+.sec-toggle .sec-label{margin:0}
+.sec-toggle .sec-count{font-size:12px;font-weight:700;color:var(--muted);background:var(--paper);border-radius:999px;padding:2px 8px;font-variant-numeric:tabular-nums}
+.sec-toggle svg{width:16px;height:16px;margin-left:auto;stroke:var(--muted);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;transition:transform .2s}
+.sec-toggle[aria-expanded="false"] svg{transform:rotate(-90deg)}
+.more-btn{width:100%;margin-top:6px}
 .tile{background:var(--paper);border-radius:14px;padding:12px 14px;min-width:0}
 .tile b{display:block;font-family:var(--font-display);font-weight:400;font-size:30px;line-height:1.05;font-variant-numeric:tabular-nums}
 .tile span{display:block;font-size:12px;color:var(--muted);margin-top:4px}
@@ -214,6 +226,7 @@ button{font:inherit;color:inherit}
 .chip[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .chip svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
 .sort-note{font-size:12px;color:var(--muted);margin:8px 0 2px;line-height:1.4}
+@media (prefers-reduced-motion: reduce){ .sec-toggle svg{transition:none} }
 .sheet h3{font-family:var(--font-display);font-weight:400;font-size:28px;margin:0 0 4px}
 .row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-block:14px;border-bottom:1px solid var(--line)}
 .row-text{min-width:0}
@@ -291,6 +304,7 @@ button{font:inherit;color:inherit}
       <div class="card" role="dialog" aria-labelledby="winTitle">
         <div class="eyebrow" id="winEyebrow">Level 1</div>
         <h2 id="winTitle">Board clear</h2>
+        <div class="score-line" id="winScore" hidden><b id="winScoreNum">0</b><span>points</span><span class="high" id="winScoreHigh" hidden>New high score</span></div>
         <p id="winDetail"></p>
         <p class="streak-line" id="winStreak" hidden></p>
         <div class="actions">
@@ -398,13 +412,21 @@ button{font:inherit;color:inherit}
     </div>
     <div class="cal" id="cal" aria-label="Dailies solved over the last five weeks"></div>
     <div class="sec-label">Levels</div>
+    <div class="tiles" style="margin-bottom:8px">
+      <div class="tile wide"><b id="stScore">0</b><span>Total score: your best on every Standard and Expert level</span>
+        <span class="why">Each arrow is worth 10 to 30 points. The faster you clear a board, the more it earns, and Expert earns 1.5 times as much.</span></div>
+    </div>
     <div class="tiles">
       <div class="tile"><b id="stBest">1</b><span>Highest level</span></div>
       <div class="tile"><b id="stCleared">0</b><span>Levels cleared</span></div>
       <div class="tile"><b id="stPerfect">0</b><span>Cleared with no misses</span></div>
       <div class="tile"><b id="stArrows">0</b><span>Arrows released</span></div>
     </div>
-    <div class="sec-label">Best times</div>
+    <button type="button" class="sec-toggle" id="timesToggle" aria-expanded="true" aria-controls="timesBody">
+      <span class="sec-label">Best times</span><span class="sec-count" id="timesCount"></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div id="timesBody">
     <p class="sec-sub">Your fastest clear of each level, with the misses and hints from that run. Tap one to replay it and try to beat it.</p>
     <div class="seg" id="timesSeg" role="group" aria-label="Difficulty for best times" style="justify-self:start;margin-bottom:4px">
       <button type="button" data-tdiff="casual" aria-pressed="false">Casual</button>
@@ -417,11 +439,14 @@ button{font:inherit;color:inherit}
         <button type="button" class="chip" data-sort="time">Time</button>
         <button type="button" class="chip" data-sort="hints">Hints</button>
         <button type="button" class="chip" data-sort="misses">Misses</button>
+        <button type="button" class="chip" data-sort="score">Score</button>
         <button type="button" class="chip" data-sort="overall">Overall</button>
       </div>
       <p class="sort-note" id="sortNote"></p>
     </div>
     <div class="times" id="timesList"></div>
+    <button type="button" class="btn quiet more-btn" id="timesMore" hidden>Show all</button>
+    </div>
     <p class="foot-note" id="stPlay">Total play time 0m. Stats are kept on this device.</p>
     <button class="btn quiet" id="closeStats" type="button">Close</button>
   </div>
@@ -1016,7 +1041,7 @@ function generateFrom(p, seedBase) {
 <script>
 (() => {
   // Bump with every release so the installed app shows which version it is running
-  const APP_VERSION = '1.9.0';
+  const APP_VERSION = '1.10.0';
   const APP_BUILD = '2026-10-19';
   const $ = (s) => document.querySelector(s);
   {
@@ -1494,9 +1519,22 @@ function generateFrom(p, seedBase) {
     return `Streak: ${c} ${c === 1 ? 'day' : 'days'}` + (b > c ? ` · best ${b}` : '');
   }
 
+  let countUp = 0;
+  function showScore(pts, high) {
+    const box = $('#winScore'), num = $('#winScoreNum');
+    cancelAnimationFrame(countUp);
+    box.hidden = pts == null;
+    $('#winScoreHigh').hidden = !high;
+    if (pts == null) return;
+    if (reduceMotion) { num.textContent = fmtScore(pts); return; }
+    const t0 = performance.now(), dur = 700;
+    const step = (now) => { const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3); num.textContent = fmtScore(pts * e); if (k < 1) countUp = requestAnimationFrame(step); };
+    num.textContent = '0'; countUp = requestAnimationFrame(step);
+  }
   function showWin() {
     const daily = G.mode === 'daily';
     const streak = $('#winStreak');
+    showScore(boardScore(G.arrows.length, Math.round(G.elapsed), G.diff), G.mode === 'levels' && G.newBest && G.prevBest != null && !!SCORE_MULT[G.diff]);
     if (daily) {
       $('#winEyebrow').textContent = `Daily · ${prettyDay(G.day)}`;
       $('#winTitle').textContent = G.replay ? 'Solved again' : 'Daily solved';
@@ -1523,6 +1561,7 @@ function generateFrom(p, seedBase) {
 
   function showDailyDone() {
     const rec = S.daily[G.day];
+    showScore(boardScore(G.arrows.length, rec.ms, rec.diff || G.diff), false);
     $('#winEyebrow').textContent = `Daily · ${prettyDay(G.day)}`;
     $('#winTitle').textContent = 'Solved today';
     $('#winDetail').textContent = `${fmtTime(rec.ms)} · ${missText(rec.misses)}. A new board arrives at midnight.`;
@@ -2023,6 +2062,8 @@ function generateFrom(p, seedBase) {
       html += `<div class="${cls.join(' ')}" title="${prettyDay(k)}${S.daily[k] ? ' · solved in ' + fmtTime(S.daily[k].ms) : ''}"></div>`;
     }
     cal.innerHTML = html;
+    $('#stScore').textContent = fmtScore(totalScore());
+    timesAll = false;
     renderTimes(diff);
     $('#statsSheet').hidden = false;
     $('#closeStats').focus({ preventScroll: true });
@@ -2030,6 +2071,29 @@ function generateFrom(p, seedBase) {
   function closeStats() { $('#statsSheet').hidden = true; timerStart(); }
 
   const CHEVRON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
+
+  // ---------- Score (Standard and Expert; Casual has none) ----------
+  // Every arrow is worth 10 points, plus up to 20 more for speed. Par is one second per arrow:
+  // at par each arrow earns 20, twice as fast about 23, half as fast about 17. Expert earns 1.5x.
+  // A board's score only depends on its size and the time, so your fastest clear is also your highest score.
+  const SCORE_MULT = { standard: 1, expert: 1.5 };
+  function boardScore(arrows, ms, d) {
+    const m = SCORE_MULT[d];
+    if (!m || !arrows || !(ms > 0)) return null;
+    const t = ms / 1000, par = arrows;
+    return Math.round(arrows * (10 + 20 * par / (t + par)) * m);
+  }
+  const fmtScore = (n) => Math.round(n).toLocaleString();
+  function totalScore() {
+    let sum = 0;
+    for (const k of Object.keys(S.times)) {
+      const [d, lv] = k.split(':');
+      if (!SCORE_MULT[d]) continue;
+      const pts = boardScore(arrowCount(+lv, d, S.times[k]), S.times[k].ms, d);
+      if (pts) sum += pts;
+    }
+    return sum;
+  }
   // Sort for the best-times list. Every sort starts best-first; tapping it again reverses it.
   // Ties fall back to the other measures, so equal hint counts still come out in a sensible order.
   const SORTS = {
@@ -2037,7 +2101,8 @@ function generateFrom(p, seedBase) {
     time:    { asc: 'Fastest first', desc: 'Slowest first', cmp: (a, b) => a.ms - b.ms || a.misses - b.misses || a.hints - b.hints || a.level - b.level },
     hints:   { asc: 'Fewest hints first', desc: 'Most hints first', cmp: (a, b) => a.hints - b.hints || a.misses - b.misses || a.ms - b.ms || a.level - b.level },
     misses:  { asc: 'Fewest misses first', desc: 'Most misses first', cmp: (a, b) => a.misses - b.misses || a.hints - b.hints || a.ms - b.ms || a.level - b.level },
-    overall: { asc: 'Best overall first', desc: 'Worst overall first', cmp: (a, b) => a.score - b.score || a.level - b.level }
+    score:   { asc: 'Highest score first', desc: 'Lowest score first', cmp: (a, b) => b.pts - a.pts || a.level - b.level },
+    overall: { asc: 'Best overall first', desc: 'Worst overall first', cmp: (a, b) => a.pace - b.pace || a.level - b.level }
   };
   let timesDiff = 'standard';
   let timesSort = (() => { const t = store.get('timesSort', null); return t && SORTS[t.key] && (t.dir === 'asc' || t.dir === 'desc') ? t : { key: 'level', dir: 'asc' }; })();
@@ -2049,20 +2114,30 @@ function generateFrom(p, seedBase) {
     return rec.arrows;
   }
 
+  const TOP_ROWS = 10;
+  let timesOpen = store.get('timesOpen', true) !== false, timesAll = false;
   function renderTimes(d) {
     timesDiff = d;
     for (const b of document.querySelectorAll('#timesSeg button')) b.setAttribute('aria-pressed', String(b.dataset.tdiff === d));
+    const scored = !!SCORE_MULT[d];
     const keys = Object.keys(S.times).filter((k) => k.startsWith(d + ':'));
     const rows = keys.map((k) => {
       const rec = S.times[k], level = +k.split(':')[1];
       return Object.assign({ level }, rec, { misses: rec.misses || 0, hints: rec.hints || 0 });
     });
-    const list = $('#timesList');
+    const list = $('#timesList'), more = $('#timesMore');
+    $('#timesCount').textContent = rows.length ? `${rows.length} ${cap(d)}` : '';
+    $('#timesToggle').setAttribute('aria-expanded', String(timesOpen));
+    $('#timesBody').hidden = !timesOpen;
     $('#sortBox').hidden = rows.length < 2;
-    if (!rows.length) { list.innerHTML = `<p class="foot-note">No ${cap(d)} times yet. Clear a level and its time shows up here.</p>`; return; }
+    $('#sortChips [data-sort="score"]').hidden = !scored;
+    if (!rows.length) { list.innerHTML = `<p class="foot-note">No ${cap(d)} times yet. Clear a level and its time shows up here.</p>`; more.hidden = true; return; }
 
-    const { key, dir } = timesSort, overall = key === 'overall';
-    if (overall) for (const r of rows) { r.arrows = arrowCount(r.level, d, S.times[`${d}:${r.level}`]); r.score = overallScore(r); }
+    // Score sort doesn't exist on Casual: fall back to level order there without forgetting the choice
+    const sortState = !scored && timesSort.key === 'score' ? { key: 'level', dir: 'asc' } : timesSort;
+    const { key, dir } = sortState, overall = key === 'overall';
+    if (overall) for (const r of rows) { r.arrows = arrowCount(r.level, d, S.times[`${d}:${r.level}`]); r.pace = overallScore(r); }
+    if (key === 'score') for (const r of rows) r.pts = boardScore(arrowCount(r.level, d, S.times[`${d}:${r.level}`]), r.ms, d) || 0;
     const cmp = SORTS[key].cmp;
     rows.sort(dir === 'asc' ? cmp : (a, b) => cmp(b, a));
 
@@ -2073,19 +2148,32 @@ function generateFrom(p, seedBase) {
       c.innerHTML = on ? `${name}<svg viewBox="0 0 24 24" aria-hidden="true">${dir === 'asc' ? '<path d="M12 19V5"/><path d="M6 11l6-6 6 6"/>' : '<path d="M12 5v14"/><path d="M6 13l6 6 6-6"/>'}</svg>` : name;
       c.setAttribute('aria-label', on ? `${name}, ${SORTS[key][dir]}. Tap to reverse.` : `Sort by ${name.toLowerCase()}`);
     }
-    const pick = SORTS[key];
-    $('#sortNote').textContent = `${pick[dir]}. Tap ${key === 'level' ? 'Level' : key.charAt(0).toUpperCase() + key.slice(1)} again for ${pick[dir === 'asc' ? 'desc' : 'asc'].charAt(0).toLowerCase() + pick[dir === 'asc' ? 'desc' : 'asc'].slice(1)}.` +
+    const pick = SORTS[key], other = pick[dir === 'asc' ? 'desc' : 'asc'];
+    $('#sortNote').textContent = `${pick[dir]}. Tap ${key.charAt(0).toUpperCase() + key.slice(1)} again for ${other.charAt(0).toLowerCase() + other.slice(1)}.` +
       (overall ? ' Overall is your time per arrow, made 10% worse for each miss and 20% worse for each hint, so big and small boards compare fairly.' : '');
 
-    list.innerHTML = rows.map((r) => {
+    const shown = timesAll ? rows : rows.slice(0, TOP_ROWS);
+    list.innerHTML = shown.map((r) => {
       const sh = levelParams(r.level, d).shape;
-      const sub = `${sh ? sh.name + ' · ' : ''}${missText(r.misses)}${hintText(r.hints)}${r.plays > 1 ? ` · ${r.plays} clears` : ''}`;
-      const small = overall ? `${r.score.toFixed(2)}s per arrow` : (r.day ? prettyDay(r.day) : '');
-      return `<button type="button" class="time-row" data-level="${r.level}" data-diff="${d}" aria-label="Replay level ${r.level}, best ${fmtBest(r.ms)}">` +
+      const pts = scored ? (r.pts || boardScore(arrowCount(r.level, d, S.times[`${d}:${r.level}`]), r.ms, d)) : null;
+      const day = r.day ? ` · ${prettyDay(r.day).replace(' ', '\u00a0')}` : ''; // keep the date on one line
+      const sub = `${sh ? sh.name + ' · ' : ''}${missText(r.misses)}${hintText(r.hints)}${r.plays > 1 ? ` · ${r.plays} clears` : ''}${scored ? day : ''}`;
+      const small = overall ? `${r.pace.toFixed(2)}s per arrow` : (scored ? `${fmtScore(pts)} pts` : (r.day ? prettyDay(r.day) : ''));
+      return `<button type="button" class="time-row" data-level="${r.level}" data-diff="${d}" aria-label="Replay level ${r.level}, best ${fmtBest(r.ms)}${scored ? `, ${fmtScore(pts)} points` : ''}">` +
         `<span><span class="lv">Level ${r.level}</span><span class="sub">${sub}</span></span>` +
         `<span class="t">${fmtBest(r.ms)}<small>${small}</small></span>${CHEVRON}</button>`;
     }).join('');
+    more.hidden = rows.length <= TOP_ROWS;
+    more.textContent = timesAll ? 'Show fewer' : `Show all ${rows.length} levels`;
   }
+  $('#timesToggle').addEventListener('click', () => {
+    timesOpen = !timesOpen; store.set('timesOpen', timesOpen);
+    renderTimes(timesDiff);
+  });
+  $('#timesMore').addEventListener('click', () => {
+    const wasAll = timesAll; timesAll = !timesAll; renderTimes(timesDiff);
+    if (wasAll) $('#timesToggle').scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' });
+  });
   $('#sortChips').addEventListener('click', (e) => {
     const c = e.target.closest('.chip');
     if (!c) return;

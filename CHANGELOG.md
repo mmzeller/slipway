@@ -2,6 +2,11 @@
 
 The version shows at the bottom of the Settings screen in the app.
 
+## 1.10.0 · Oct 19, 2026
+- Scores on Standard and Expert: each arrow is worth 10 to 30 points depending on how fast you clear the board, and Expert earns 1.5 times as much. Your score shows on the win card, on each best time, and as a total in Stats
+- Sort best times by score
+- The Best times list shows your top 10 with a Show all button, and its heading collapses the whole list
+
 ## 1.9.0 · Oct 19, 2026
 - Expert is harder: boards now start with only about 4 arrows you can tap right away (Standard has about 9), so finding a way in takes more thought. The rules are the same and every board can still be cleared
 - Expert best times start fresh, since the boards are different. Standard and Casual boards and times are unchanged

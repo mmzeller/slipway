@@ -1,5 +1,5 @@
 // Slipway offline support. The cache name changes with every build, so updates replace old files.
-const CACHE = 'slipway-1.9.0-84b782de';
+const CACHE = 'slipway-1.10.0-9d55a202';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png', './icons/favicon-32.png'];
 
 self.addEventListener('install', (e) => {
