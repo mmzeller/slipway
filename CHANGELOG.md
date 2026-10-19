@@ -2,6 +2,10 @@
 
 The version shows at the bottom of the Settings screen in the app.
 
+## 1.9.0 · Oct 19, 2026
+- Expert is harder: boards now start with only about 4 arrows you can tap right away (Standard has about 9), so finding a way in takes more thought. The rules are the same and every board can still be cleared
+- Expert best times start fresh, since the boards are different. Standard and Casual boards and times are unchanged
+
 ## 1.8.0 · Oct 19, 2026
 - On Standard and Expert, the timer changes color every 30 seconds, from green at the start to red at 3:00, and blinks from 3:30. Casual keeps a plain timer
 

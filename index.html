@@ -337,7 +337,7 @@ button{font:inherit;color:inherit}
     <div class="row">
       <div class="row-text">
         <div class="row-title">Difficulty</div>
-        <div class="row-sub">Board size and how tangled the lanes get. Hints per board: Casual unlimited, Standard 2, Expert 3. The current board restarts.</div>
+        <div class="row-sub">Casual is smaller and gentler. Expert is bigger and starts with only a few arrows free to tap. Hints per board: Casual unlimited, Standard 2, Expert 3. The current board restarts.</div>
       </div>
     </div>
     <div class="seg" id="diffSeg" role="group" aria-label="Difficulty" style="justify-self:start;margin-bottom:6px">
@@ -429,7 +429,7 @@ button{font:inherit;color:inherit}
 
 <script id="gen">
 // ===GEN-START===
-const GEN_VERSION = 3;
+const GEN_VERSION = 4;
 const DR = [-1, 0, 1, 0], DC = [0, 1, 0, -1]; // up, right, down, left
 
 function mulberry32(a) {
@@ -620,7 +620,7 @@ function applyDifficulty(p, diff) {
   if (diff === 'expert') {
     const W = Math.min(33, p.W + 5);
     return Object.assign({}, p, { W, H: Math.round(W * (p.H / p.W)), maxLen: Math.min(42, p.maxLen + 6),
-      straight: Math.max(0.36, p.straight - 0.06), samples: 14, freeWeight: 2.5, tries: 4 });
+      straight: Math.max(0.36, p.straight - 0.06), samples: 14, freeWeight: 2.5, tries: 4, harden: true });
   }
   return p;
 }
@@ -684,6 +684,10 @@ function buildBoard(p, rng) {
   const minLane = new Float64Array(N).fill(Infinity);
   const arrows = [];
   let inserts = 0;
+  // Expert: only a few arrows may sit on the outer edge pointing straight off it. Those are always free,
+  // so every other arrow has at least one cell in front of it that later arrows fill.
+  let exits = 0;
+  const exitBudget = p.harden ? 3 : Infinity;
 
   const empties = [], where = new Int32Array(N).fill(-1);
   for (let k = 0; k < N; k++) if (mask[k]) { where[k] = empties.length; empties.push(k); }
@@ -721,6 +725,8 @@ function buildBoard(p, rng) {
     const neck = nr * W + nc;
     if (!free(neck)) return false;
     const lane = laneOf(r, c, d);
+    const exit = !lane.some((k) => mask[k]);
+    if (exit && exits >= exitBudget) return false;
     let lo = -Infinity;
     for (const k of lane) { const o = occ[k]; if (o >= 0 && arrows[o].rank > lo) lo = arrows[o].rank; }
     let hi = Math.min(minLane[h], minLane[neck]);
@@ -754,6 +760,7 @@ function buildBoard(p, rng) {
     for (const k of body) { occ[k] = id; take(k); }
     for (const k of lane) if (rank < minLane[k]) minLane[k] = rank;
     arrows.push({ body: body.slice().reverse(), dir: d, rank, lane, laneSet });
+    if (!lane.some((k) => mask[k])) exits++;
     if (++inserts % 24 === 0) renormalize();
     return true;
   }
@@ -804,7 +811,13 @@ function buildBoard(p, rng) {
     let placed = false;
     for (const h of gaps) {
       if (!free(h)) continue;
-      for (const d of [0, 1, 2, 3].sort(() => rng() - 0.5)) if (tryPlace(h, d, 2)) { placed = true; break; }
+      let dirs = [0, 1, 2, 3].sort(() => rng() - 0.5);
+      if (p.harden) {
+        const r = (h / W) | 0, c = h % W, blockedBy = (d) => { let n = 0, rr = r + DR[d], cc = c + DC[d]; while (inb(rr, cc)) { if (occ[rr * W + cc] >= 0) n++; rr += DR[d]; cc += DC[d]; } return n; };
+        const bc = dirs.map(blockedBy);
+        dirs = dirs.map((d, k) => [d, bc[k]]).sort((x, y) => (y[1] > 0) - (x[1] > 0)).map((x) => x[0]); // blocked lanes first, random among them
+      }
+      for (const d of dirs) if (tryPlace(h, d, 2)) { placed = true; break; }
     }
     if (!placed && !extend()) break;
   }
@@ -864,9 +877,105 @@ function generateDaily(dayNum, diff) {
   return generateFrom(dailyParams(dayNum, diff), (Math.imul(dayNum, 0x85EBCA6B) ^ 0x7ED55D16 ^ DIFF_SALT[diff]) | 0);
 }
 
+// Expert: rework the arrows that start out free until only a few remain, keeping every board solvable.
+// A free arrow is either turned around so it points into the board, or merged onto the tail of the
+// arrow beside it. Neither change opens a lane for anything else, and each one is kept only if the
+// solver can still clear the whole board.
+function hardenBoard(b, maxLen, rng) {
+  const { W, H } = b;
+  const target = b.arrows.length < 30 ? 3 : 4;
+  const inb = (r, c) => r >= 0 && r < H && c >= 0 && c < W;
+  const freeOf = (arr) => { const occ = occupancy(W, H, arr, null), out = []; arr.forEach((a, i) => { if (laneCheck(occ, W, H, a, i).free) out.push(i); }); return out; };
+  const dirOf = (h, n) => [0, 1, 2, 3].find((d) => h[0] - n[0] === DR[d] && h[1] - n[1] === DC[d]);
+  const adj = (x, y) => Math.abs(x[0] - y[0]) + Math.abs(x[1] - y[1]) === 1;
+  const laneHits = (h, d, own, occ, self) => { // [crosses its own body, blocked by another arrow]
+    let rr = h[0] + DR[d], cc = h[1] + DC[d], blocked = false;
+    while (inb(rr, cc)) { const k = rr * W + cc; if (own.has(k)) return [true, blocked]; const o = occ[k]; if (o >= 0 && o !== self) blocked = true; rr += DR[d]; cc += DC[d]; }
+    return [false, blocked];
+  };
+  function flip(arr, i) {
+    const a = arr[i], cells = a.cells.slice().reverse(), L = cells.length;
+    const d = dirOf(cells[L - 1], cells[L - 2]);
+    const own = new Set(a.cells.map(([r, c]) => r * W + c));
+    const [self, blocked] = laneHits(cells[L - 1], d, own, occupancy(W, H, arr, null), i);
+    if (self || !blocked) return [];
+    const next = arr.slice(); next[i] = { cells, dir: d }; return [next];
+  }
+  function merge(arr, i) {
+    const a = arr[i], L = a.cells.length, own = new Set(a.cells.map(([r, c]) => r * W + c));
+    const opts = [];
+    arr.forEach((o, j) => {
+      if (j === i || o.cells.length + L > maxLen) return;
+      const t = o.cells[0];
+      let path = null;
+      if (adj(t, a.cells[L - 1])) path = a.cells.slice();
+      else if (adj(t, a.cells[0])) path = a.cells.slice().reverse();
+      if (!path) return;
+      const [self] = laneHits(o.cells[o.cells.length - 1], o.dir, own, new Int16Array(W * H).fill(-1), j);
+      if (!self) opts.push({ j, cells: path.concat(o.cells) });
+    });
+    return opts.sort(() => rng() - 0.5).map((pick) => {
+      const next = arr.map((o, k) => (k === pick.j ? { cells: pick.cells, dir: o.dir } : o));
+      next.splice(i, 1);
+      return next;
+    });
+  }
+  // A neighbour's tail grows into an empty cell in front of a free arrow, so the free arrow now waits for it
+  function plug(arr, i) {
+    const a = arr[i], h = a.cells[a.cells.length - 1], occ = occupancy(W, H, arr, null), outs = [];
+    let rr = h[0] + DR[a.dir], cc = h[1] + DC[a.dir];
+    while (inb(rr, cc)) {
+      const k = rr * W + cc;
+      if (b.mask[k] && occ[k] < 0) {
+        const hole = [rr, cc];
+        arr.forEach((o, j) => {
+          if (j === i || o.cells.length + 1 > maxLen || !adj(o.cells[0], hole)) return;
+          const own = new Set([k]);
+          const [self] = laneHits(o.cells[o.cells.length - 1], o.dir, own, new Int16Array(W * H).fill(-1), j);
+          if (self) return;
+          const next = arr.slice(); next[j] = { cells: [hole].concat(o.cells), dir: o.dir }; outs.push(next);
+        });
+      }
+      rr += DR[a.dir]; cc += DC[a.dir];
+    }
+    return outs.sort(() => rng() - 0.5);
+  }
+  // Shorten a free arrow by one to three cells so its new tip points at other arrows instead of off the board
+  function trim(arr, i) {
+    const a = arr[i], L = a.cells.length, occ = occupancy(W, H, arr, null), outs = [];
+    for (let k = 1; k <= 3 && L - k >= 2; k++) {
+      const cells = a.cells.slice(0, L - k), d = dirOf(cells[cells.length - 1], cells[cells.length - 2]);
+      const own = new Set(cells.map(([r, c]) => r * W + c));
+      const [self, blocked] = laneHits(cells[cells.length - 1], d, own, occ, i);
+      if (self || !blocked) continue;
+      const next = arr.slice(); next[i] = { cells, dir: d }; outs.push(next);
+    }
+    return outs;
+  }
+  let arrows = b.arrows, free = freeOf(arrows);
+  const tried = new Set(), keyOf = (a) => a.cells[0].join(',') + ':' + a.cells.length;
+  let checks = 0;
+  for (let guard = 0; free.length > target && guard < 120 && checks < 400; guard++) {
+    const cand = free.filter((i) => !tried.has(keyOf(arrows[i])));
+    if (!cand.length) break;
+    const i = cand[Math.floor(rng() * cand.length)];
+    tried.add(keyOf(arrows[i]));
+    let done = false;
+    for (const next of [...plug(arrows, i), ...trim(arrows, i), ...flip(arrows, i), ...merge(arrows, i)]) {
+      checks++;
+      const f2 = freeOf(next);
+      if (f2.length >= 1 && f2.length < free.length && solveGreedy(W, H, next).solved) { arrows = next; free = f2; done = true; break; }
+      if (checks >= 400) break;
+    }
+    if (done) tried.clear(); // the board changed, so arrows that failed before may work now
+  }
+  return arrows;
+}
+
 function generateFrom(p, seedBase) {
   let best = null, bestScore = -Infinity;
   const tries = p.tries || (p.W * p.H > 500 ? 2 : 4);
+  const built = [];
   for (let i = 0; i < tries; i++) {
     const rng = mulberry32((seedBase + Math.imul(i, 104729)) >>> 0);
     const b = buildBoard(p, rng);
@@ -875,7 +984,21 @@ function generateFrom(p, seedBase) {
     const cov = b.filled / maskCells;
     const freeRatio = countFree(p.W, p.H, b.arrows) / b.arrows.length;
     const score = cov * 2 - freeRatio * (p.freeWeight || 1);
+    built.push({ b, score });
     if (score > bestScore) { best = b; bestScore = score; }
+  }
+  if (p.harden) {
+    // Rework the best board; if it still starts too loose, try the other candidates and keep the tightest
+    built.sort((x, y) => y.score - x.score);
+    let keep = null, keepFree = Infinity;
+    for (let n = 0; n < built.length; n++) {
+      const b = built[n].b;
+      b.arrows = hardenBoard(b, Math.round(p.maxLen * 1.6), mulberry32((seedBase ^ 0x5f3759df ^ Math.imul(n, 0x9e3779b1)) >>> 0));
+      const f = countFree(p.W, p.H, b.arrows);
+      if (f < keepFree) { keep = b; keepFree = f; }
+      if (keepFree <= 6) break;
+    }
+    best = keep;
   }
   // Trim rows and columns the shape never uses: they hold no arrows, so lanes are unaffected
   let r0 = p.H, r1 = -1, c0 = p.W, c1 = -1;
@@ -893,7 +1016,7 @@ function generateFrom(p, seedBase) {
 <script>
 (() => {
   // Bump with every release so the installed app shows which version it is running
-  const APP_VERSION = '1.8.0';
+  const APP_VERSION = '1.9.0';
   const APP_BUILD = '2026-10-19';
   const $ = (s) => document.querySelector(s);
   {
@@ -941,6 +1064,14 @@ function generateFrom(p, seedBase) {
     return base;
   })();
   const saveStats = () => store.set('stats', S);
+  // 1.9.0 rebuilt Expert boards, so Expert times from the old boards are kept aside instead of shown
+  if (!S.expertV2) {
+    const old = {};
+    for (const k of Object.keys(S.times)) if (k.startsWith('expert:')) { old[k] = S.times[k]; delete S.times[k]; }
+    if (Object.keys(old).length) S.archivedTimes = Object.assign({}, S.archivedTimes, { expertBefore190: old });
+    S.expertV2 = true;
+    saveStats();
+  }
   function currentStreak() {
     let n = numOf(todayKey());
     if (!S.daily[keyFromNum(n)]) n--;
