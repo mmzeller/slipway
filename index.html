@@ -415,6 +415,8 @@ button{font:inherit;color:inherit}
     <div class="tiles" style="margin-bottom:8px">
       <div class="tile wide"><b id="stScore">0</b><span>Total score: your best on every Standard and Expert level</span>
         <span class="why">Every 100 arrows on a board are worth 1 to 3 points, about 2 when you clear at one second per arrow. Faster clears earn more, and Expert earns 1.5 times as much.</span></div>
+      <div class="tile"><b id="stScoreStd">0</b><span>Standard score</span></div>
+      <div class="tile"><b id="stScoreExp">0</b><span>Expert score</span></div>
     </div>
     <div class="tiles">
       <div class="tile"><b id="stBest">1</b><span>Highest level</span></div>
@@ -1041,7 +1043,7 @@ function generateFrom(p, seedBase) {
 <script>
 (() => {
   // Bump with every release so the installed app shows which version it is running
-  const APP_VERSION = '1.10.1';
+  const APP_VERSION = '1.10.2';
   const APP_BUILD = '2026-10-19';
   const $ = (s) => document.querySelector(s);
   {
@@ -2064,7 +2066,10 @@ function generateFrom(p, seedBase) {
       html += `<div class="${cls.join(' ')}" title="${prettyDay(k)}${S.daily[k] ? ' · solved in ' + fmtTime(S.daily[k].ms) : ''}"></div>`;
     }
     cal.innerHTML = html;
-    $('#stScore').textContent = fmtTotal(totalScore());
+    const std = totalScore('standard'), exp = totalScore('expert');
+    $('#stScoreStd').textContent = fmtTotal(std);
+    $('#stScoreExp').textContent = fmtTotal(exp);
+    $('#stScore').textContent = fmtTotal(Math.round((std + exp) * 10) / 10);
     timesAll = false;
     renderTimes(diff);
     $('#statsSheet').hidden = false;
@@ -2089,11 +2094,11 @@ function generateFrom(p, seedBase) {
   // One decimal for a level's score; the total drops the decimal once it reaches 100
   const fmtScore = (n) => n.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const fmtTotal = (n) => n >= 100 ? Math.round(n).toLocaleString() : fmtScore(n);
-  function totalScore() {
+  function totalScore(only) {
     let sum = 0;
     for (const k of Object.keys(S.times)) {
       const [d, lv] = k.split(':');
-      if (!SCORE_MULT[d]) continue;
+      if (!SCORE_MULT[d] || (only && d !== only)) continue;
       const pts = boardScore(arrowCount(+lv, d, S.times[k]), S.times[k].ms, d);
       if (pts) sum += Math.round(pts * 10) / 10; // add up the values as shown, so the total matches the list
     }

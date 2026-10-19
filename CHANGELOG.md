@@ -2,6 +2,9 @@
 
 The version shows at the bottom of the Settings screen in the app.
 
+## 1.10.2 · Oct 19, 2026
+- Stats shows a Standard score and an Expert score alongside the overall total
+
 ## 1.10.1 · Oct 19, 2026
 - Scores are 1,000 times smaller so they're easier to read at a glance: a level is worth a few points, shown with one decimal, and your total is in the hundreds. How points are earned hasn't changed
 
