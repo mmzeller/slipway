@@ -414,7 +414,7 @@ button{font:inherit;color:inherit}
     <div class="sec-label">Levels</div>
     <div class="tiles" style="margin-bottom:8px">
       <div class="tile wide"><b id="stScore">0</b><span>Total score: your best on every Standard and Expert level</span>
-        <span class="why">Each arrow is worth 10 to 30 points. The faster you clear a board, the more it earns, and Expert earns 1.5 times as much.</span></div>
+        <span class="why">Every 100 arrows on a board are worth 1 to 3 points, about 2 when you clear at one second per arrow. Faster clears earn more, and Expert earns 1.5 times as much.</span></div>
     </div>
     <div class="tiles">
       <div class="tile"><b id="stBest">1</b><span>Highest level</span></div>
@@ -1041,7 +1041,7 @@ function generateFrom(p, seedBase) {
 <script>
 (() => {
   // Bump with every release so the installed app shows which version it is running
-  const APP_VERSION = '1.10.0';
+  const APP_VERSION = '1.10.1';
   const APP_BUILD = '2026-10-19';
   const $ = (s) => document.querySelector(s);
   {
@@ -1534,7 +1534,9 @@ function generateFrom(p, seedBase) {
   function showWin() {
     const daily = G.mode === 'daily';
     const streak = $('#winStreak');
-    showScore(boardScore(G.arrows.length, Math.round(G.elapsed), G.diff), G.mode === 'levels' && G.newBest && G.prevBest != null && !!SCORE_MULT[G.diff]);
+    const pts = boardScore(G.arrows.length, Math.round(G.elapsed), G.diff);
+    const prevPts = G.mode === 'levels' && G.newBest && G.prevBest != null ? boardScore(G.arrows.length, G.prevBest, G.diff) : null;
+    showScore(pts, pts != null && prevPts != null && Math.round(pts * 10) > Math.round(prevPts * 10));
     if (daily) {
       $('#winEyebrow').textContent = `Daily · ${prettyDay(G.day)}`;
       $('#winTitle').textContent = G.replay ? 'Solved again' : 'Daily solved';
@@ -2062,7 +2064,7 @@ function generateFrom(p, seedBase) {
       html += `<div class="${cls.join(' ')}" title="${prettyDay(k)}${S.daily[k] ? ' · solved in ' + fmtTime(S.daily[k].ms) : ''}"></div>`;
     }
     cal.innerHTML = html;
-    $('#stScore').textContent = fmtScore(totalScore());
+    $('#stScore').textContent = fmtTotal(totalScore());
     timesAll = false;
     renderTimes(diff);
     $('#statsSheet').hidden = false;
@@ -2073,26 +2075,29 @@ function generateFrom(p, seedBase) {
   const CHEVRON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
 
   // ---------- Score (Standard and Expert; Casual has none) ----------
-  // Every arrow is worth 10 points, plus up to 20 more for speed. Par is one second per arrow:
-  // at par each arrow earns 20, twice as fast about 23, half as fast about 17. Expert earns 1.5x.
+  // Every 100 arrows are worth 1 point, plus up to 2 more for speed. Par is one second per arrow:
+  // at par 100 arrows earn 2, twice as fast about 2.3, half as fast about 1.7. Expert earns 1.5x.
+  // (1.10.0 used the same curve at 1,000 times the size; 1.10.1 scaled it down so totals stay readable.)
   // A board's score only depends on its size and the time, so your fastest clear is also your highest score.
   const SCORE_MULT = { standard: 1, expert: 1.5 };
   function boardScore(arrows, ms, d) {
     const m = SCORE_MULT[d];
     if (!m || !arrows || !(ms > 0)) return null;
     const t = ms / 1000, par = arrows;
-    return Math.round(arrows * (10 + 20 * par / (t + par)) * m);
+    return arrows * (10 + 20 * par / (t + par)) * m / 1000;
   }
-  const fmtScore = (n) => Math.round(n).toLocaleString();
+  // One decimal for a level's score; the total drops the decimal once it reaches 100
+  const fmtScore = (n) => n.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const fmtTotal = (n) => n >= 100 ? Math.round(n).toLocaleString() : fmtScore(n);
   function totalScore() {
     let sum = 0;
     for (const k of Object.keys(S.times)) {
       const [d, lv] = k.split(':');
       if (!SCORE_MULT[d]) continue;
       const pts = boardScore(arrowCount(+lv, d, S.times[k]), S.times[k].ms, d);
-      if (pts) sum += pts;
+      if (pts) sum += Math.round(pts * 10) / 10; // add up the values as shown, so the total matches the list
     }
-    return sum;
+    return Math.round(sum * 10) / 10;
   }
   // Sort for the best-times list. Every sort starts best-first; tapping it again reverses it.
   // Ties fall back to the other measures, so equal hint counts still come out in a sensible order.

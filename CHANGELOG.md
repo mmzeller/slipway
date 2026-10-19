@@ -2,6 +2,9 @@
 
 The version shows at the bottom of the Settings screen in the app.
 
+## 1.10.1 · Oct 19, 2026
+- Scores are 1,000 times smaller so they're easier to read at a glance: a level is worth a few points, shown with one decimal, and your total is in the hundreds. How points are earned hasn't changed
+
 ## 1.10.0 · Oct 19, 2026
 - Scores on Standard and Expert: each arrow is worth 10 to 30 points depending on how fast you clear the board, and Expert earns 1.5 times as much. Your score shows on the win card, on each best time, and as a total in Stats
 - Sort best times by score
