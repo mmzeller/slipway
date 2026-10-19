@@ -2,6 +2,9 @@
 
 The version shows at the bottom of the Settings screen in the app.
 
+## 1.8.0 · Oct 19, 2026
+- On Standard and Expert, the timer changes color every 30 seconds, from green at the start to red at 3:00, and blinks from 3:30. Casual keeps a plain timer
+
 ## 1.7.2 · Oct 16, 2026
 - One Settings switch, Tap assist, now turns all the fat-finger help on or off: the glow under your finger and ignoring taps between two arrows
 - Fixed: sliding your finger away to cancel a tap could make the very next tap do nothing

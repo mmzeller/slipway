@@ -31,6 +31,8 @@
   --line:#CDD5D0;
   --accent:#2B55C8;
   --danger:#C42E45;
+  /* Timer colours, one per 30 seconds: green at 0:00 to red from 3:00 */
+  --tc0:#1A6E39;--tc1:#436E10;--tc2:#6E6A00;--tc3:#8F5A00;--tc4:#A8480C;--tc5:#B53521;--tc6:#C42E45;
   --shadow:rgba(28,37,49,.14);
   --scrim:rgba(28,37,49,.32);
   --font-display:"Gloock","Iowan Old Style",Georgia,serif;
@@ -40,11 +42,13 @@
   :root:not([data-theme="light"]){
     --paper:#11161C;--surface:#1A2129;--ink:#E3E8E2;--muted:#8F9B95;--dot:#2C353E;--line:#2B343D;
     --accent:#86A6FF;--danger:#FF6F82;--shadow:rgba(0,0,0,.5);--scrim:rgba(0,0,0,.55);color-scheme:dark;
+    --tc0:#5FD38A;--tc1:#A3D35A;--tc2:#DCCB4C;--tc3:#F2A848;--tc4:#F78B52;--tc5:#FA7062;--tc6:#FF6F82;
   }
 }
 :root[data-theme="dark"]{
   --paper:#11161C;--surface:#1A2129;--ink:#E3E8E2;--muted:#8F9B95;--dot:#2C353E;--line:#2B343D;
   --accent:#86A6FF;--danger:#FF6F82;--shadow:rgba(0,0,0,.5);--scrim:rgba(0,0,0,.55);color-scheme:dark;
+  --tc0:#5FD38A;--tc1:#A3D35A;--tc2:#DCCB4C;--tc3:#F2A848;--tc4:#F78B52;--tc5:#FA7062;--tc6:#FF6F82;
 }
 
 html{height:100%;box-sizing:border-box;touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:100%}
@@ -89,6 +93,18 @@ header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
 .meta{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
 .clock{font-size:13px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;gap:5px}
 .clock svg{width:13px;height:13px;stroke:var(--muted);fill:none;stroke-width:2.2;stroke-linecap:round}
+/* Standard and Expert: the timer shifts colour every 30 seconds and blinks from 3:30 */
+.clock[data-step]{transition:color .8s ease}
+.clock[data-step] svg{stroke:currentColor;transition:stroke .8s ease}
+.clock[data-step="0"]{color:var(--tc0)}
+.clock[data-step="1"]{color:var(--tc1)}
+.clock[data-step="2"]{color:var(--tc2)}
+.clock[data-step="3"]{color:var(--tc3)}
+.clock[data-step="4"]{color:var(--tc4)}
+.clock[data-step="5"]{color:var(--tc5)}
+.clock[data-step="6"]{color:var(--tc6)}
+.clock.blink{animation:clockblink 1s steps(1, end) infinite}
+@keyframes clockblink{0%{opacity:1}50%{opacity:.2}}
 
 /* Board */
 .stage{position:relative;min-height:0;display:grid;place-items:center;z-index:2;overflow:hidden;touch-action:none;border-radius:12px}
@@ -231,7 +247,8 @@ button{font:inherit;color:inherit}
 
 @media (prefers-reduced-motion: reduce){
   .arrow.hinted,.halo.unclear.flash{animation:none}
-  .overlay,.sheet-back,.heart.pop{animation:none}
+  .overlay,.sheet-back,.heart.pop,.clock.blink{animation:none}
+  .clock.blink{text-decoration:underline;text-underline-offset:3px}
 }
 </style>
 
@@ -876,8 +893,8 @@ function generateFrom(p, seedBase) {
 <script>
 (() => {
   // Bump with every release so the installed app shows which version it is running
-  const APP_VERSION = '1.7.2';
-  const APP_BUILD = '2026-10-16';
+  const APP_VERSION = '1.8.0';
+  const APP_BUILD = '2026-10-19';
   const $ = (s) => document.querySelector(s);
   {
     const [y, m, d] = APP_BUILD.split('-').map(Number);
@@ -939,7 +956,16 @@ function generateFrom(p, seedBase) {
     if (G && G.running) { const d = performance.now() - G.running; G.elapsed += d; G.running = 0; S.playMs += d; saveStats(); }
   }
   const elapsedMs = () => G ? G.elapsed + (G.running ? performance.now() - G.running : 0) : 0;
-  setInterval(() => { if (G) { $('#clock').textContent = fmtTime(elapsedMs()); syncBestTag(); } }, 500);
+  setInterval(() => { if (G) { $('#clock').textContent = fmtTime(elapsedMs()); syncBestTag(); syncClockColor(); } }, 500);
+  // Seven colours, one per 30-second block (green at 0:00, red from 3:00); blinks from 3:30 while running.
+  // Standard and Expert only; Casual keeps a plain timer.
+  function syncClockColor() {
+    const c = document.querySelector('.clock');
+    if (!G || G.diff === 'casual') { c.removeAttribute('data-step'); c.classList.remove('blink'); return; }
+    const sec = elapsedMs() / 1000, step = String(Math.min(6, Math.floor(sec / 30)));
+    if (c.dataset.step !== step) c.dataset.step = step;
+    c.classList.toggle('blink', sec >= 210 && !!G.running);
+  }
 
   // ---------- Sound ----------
   const sound = (() => {
@@ -1171,6 +1197,7 @@ function generateFrom(p, seedBase) {
     }
     $('#meta').textContent = `${G.shape ? G.shape + ' · ' : ''}${G.W} × ${G.H} · ${G.left} ${G.left === 1 ? 'arrow' : 'arrows'} left`;
     $('#clock').textContent = fmtTime(elapsedMs());
+    syncClockColor();
     syncBestTag();
     updateHintBtn();
     const tip = $('#tip');
