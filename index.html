@@ -87,6 +87,7 @@ header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
 .heart{width:22px;height:20px;display:block}
 .heart path{fill:var(--danger);stroke:var(--danger);stroke-width:1.6;stroke-linejoin:round;transition:fill .25s,stroke .25s}
 .heart.lost path{fill:transparent;stroke:var(--line)}
+.hearts.mull .heart:not(.lost) path{fill:var(--tc3);stroke:var(--tc3)} /* second-chance hearts after a mulligan */
 .heart.pop{animation:pop .35s ease-out}
 @keyframes pop{40%{transform:scale(1.25)}}
 .pill{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);border:1.5px solid currentColor;border-radius:999px;padding:3px 10px}
@@ -196,6 +197,7 @@ button{font:inherit;color:inherit}
 .score-line b{font-family:var(--font-display);font-weight:400;font-size:40px;line-height:1;font-variant-numeric:tabular-nums;color:var(--ink)}
 .score-line span{font-size:14px;color:var(--muted);font-weight:700}
 .score-line .high{color:var(--accent)}
+.score-line .cut{color:var(--muted);font-weight:400}
 .sec-toggle{display:flex;align-items:center;gap:8px;width:100%;margin:14px 0 8px;padding:0;border:0;background:transparent;color:var(--muted);font:inherit;cursor:pointer;text-align:left}
 .sec-toggle .sec-label{margin:0}
 .sec-toggle .sec-count{font-size:12px;font-weight:700;color:var(--muted);background:var(--paper);border-radius:999px;padding:2px 8px;font-variant-numeric:tabular-nums}
@@ -304,7 +306,7 @@ button{font:inherit;color:inherit}
       <div class="card" role="dialog" aria-labelledby="winTitle">
         <div class="eyebrow" id="winEyebrow">Level 1</div>
         <h2 id="winTitle">Board clear</h2>
-        <div class="score-line" id="winScore" hidden><b id="winScoreNum">0</b><span>points</span><span class="high" id="winScoreHigh" hidden>New high score</span></div>
+        <div class="score-line" id="winScore" hidden><b id="winScoreNum">0</b><span>points</span><span class="cut" id="winScoreCut" hidden></span><span class="high" id="winScoreHigh" hidden>New high score</span></div>
         <p id="winDetail"></p>
         <p class="streak-line" id="winStreak" hidden></p>
         <div class="actions">
@@ -318,9 +320,10 @@ button{font:inherit;color:inherit}
       <div class="card" role="dialog" aria-labelledby="loseTitle">
         <div class="eyebrow" id="loseEyebrow">Level 1</div>
         <h2 id="loseTitle">Out of hearts</h2>
-        <p>The board resets to the same puzzle with three fresh hearts.</p>
+        <p id="loseText">Take a mulligan to keep this board as it is with three fresh hearts, or start it over.</p>
         <div class="actions">
-          <button class="btn primary" id="retryBtn" type="button">Try again</button>
+          <button class="btn primary" id="mulliganBtn" type="button">Take a mulligan</button>
+          <button class="btn" id="retryBtn" type="button">Start the board over</button>
           <button class="btn quiet" id="relaxBtn" type="button">Play this board relaxed</button>
         </div>
       </div>
@@ -1043,7 +1046,7 @@ function generateFrom(p, seedBase) {
 <script>
 (() => {
   // Bump with every release so the installed app shows which version it is running
-  const APP_VERSION = '1.10.2';
+  const APP_VERSION = '1.11.0';
   const APP_BUILD = '2026-10-19';
   const $ = (s) => document.querySelector(s);
   {
@@ -1231,7 +1234,7 @@ function generateFrom(p, seedBase) {
       mode: spec.mode, level, day: spec.day || null, replay: !!spec.replay, diff,
       W: lv.W, H: lv.H, mask: lv.mask, shape: lv.shape,
       arrows: lv.arrows.map((a, i) => ({ id: i, cells: a.cells, dir: a.dir, removed: false, busy: false, pending: false })),
-      occ: null, hearts: 3, misses: 0, left: lv.arrows.length, over: false, hintId: -1, hintTimer: 0, hintsUsed: 0, elapsed: 0, running: 0, started: false
+      occ: null, hearts: 3, misses: 0, left: lv.arrows.length, over: false, hintId: -1, hintTimer: 0, hintsUsed: 0, mulligans: 0, elapsed: 0, running: 0, started: false
     };
     Z.s = 1; Z.cx = null; Z.cy = null;
     if (restore && restore.gen === GEN_VERSION && restore.diff === diff && Array.isArray(restore.removed)) {
@@ -1240,6 +1243,7 @@ function generateFrom(p, seedBase) {
       if (Number.isFinite(restore.misses)) G.misses = restore.misses;
       if (Number.isFinite(restore.elapsed)) G.elapsed = restore.elapsed;
       if (Number.isFinite(restore.hintsUsed)) G.hintsUsed = restore.hintsUsed;
+      if (Number.isFinite(restore.mulligans)) G.mulligans = restore.mulligans;
       if (Number.isFinite(restore.hintId) && G.arrows[restore.hintId] && !G.arrows[restore.hintId].removed) G.hintId = restore.hintId;
       if (Array.isArray(restore.pending)) for (const id of restore.pending) if (G.arrows[id] && !G.arrows[id].removed) G.arrows[id].pending = true;
       G.started = G.elapsed > 0 || G.left < G.arrows.length || G.misses > 0;
@@ -1343,11 +1347,13 @@ function generateFrom(p, seedBase) {
     $('#lvlNum').textContent = daily ? prettyDay(G.day) : G.level;
     const h = $('#hearts');
     if (settings.relaxed) {
+      h.classList.remove('mull');
       h.innerHTML = '<span class="pill">Relaxed</span>';
       h.setAttribute('aria-label', 'Relaxed mode, no hearts');
     } else {
       h.innerHTML = [0, 1, 2].map((i) => heartSvg(i >= G.hearts)).join('');
-      h.setAttribute('aria-label', `${G.hearts} of 3 hearts left`);
+      h.setAttribute('aria-label', `${G.hearts} of 3 hearts left` + (G.mulligans ? `, ${mullText(G.mulligans)} taken` : ''));
+      h.classList.toggle('mull', G.mulligans > 0);
       if (lostIndex != null && !reduceMotion) {
         const lost = h.children[lostIndex];
         if (lost) lost.classList.add('pop');
@@ -1477,13 +1483,16 @@ function generateFrom(p, seedBase) {
       S.cleared++;
       if (G.misses === 0) S.perfect++;
       // Personal best for this level at this difficulty
-      const key = `${G.diff}:${G.level}`, prev = S.times[key], ms = Math.round(G.elapsed);
+      // A run replaces the saved best only if it ranks higher once mulligans are taken off,
+      // so for runs without a mulligan this is simply "faster wins", exactly as before.
+      const key = `${G.diff}:${G.level}`, prev = S.times[key], ms = Math.round(G.elapsed), n = G.arrows.length;
+      G.prevRec = prev ? Object.assign({}, prev, { arrows: prev.arrows || n, mulligans: prev.mulligans || 0 }) : null;
       G.prevBest = prev ? prev.ms : null;
-      G.newBest = !prev || ms < prev.ms;
-      if (G.newBest) S.times[key] = { ms, misses: G.misses, hints: G.hintsUsed, day: todayKey(), plays: (prev ? prev.plays || 1 : 0) + 1, arrows: G.arrows.length };
-      else { prev.plays = (prev.plays || 1) + 1; prev.arrows = G.arrows.length; }
+      G.newBest = !prev || rankValue(n, ms, G.mulligans) > rankValue(G.prevRec.arrows, prev.ms, G.prevRec.mulligans);
+      if (G.newBest) S.times[key] = { ms, misses: G.misses, hints: G.hintsUsed, mulligans: G.mulligans, day: todayKey(), plays: (prev ? prev.plays || 1 : 0) + 1, arrows: n };
+      else { prev.plays = (prev.plays || 1) + 1; prev.arrows = n; }
     } else if (!G.replay && !S.daily[G.day]) {
-      S.daily[G.day] = { ms: Math.round(G.elapsed), misses: G.misses, diff: G.diff };
+      S.daily[G.day] = { ms: Math.round(G.elapsed), misses: G.misses, mulligans: G.mulligans, diff: G.diff };
       S.bestStreak = Math.max(S.bestStreak || 0, currentStreak());
     }
     saveStats();
@@ -1498,6 +1507,8 @@ function generateFrom(p, seedBase) {
   }
   const missText = (m) => m === 0 ? 'no misses' : m === 1 ? '1 miss' : m + ' misses';
   const hintText = (h) => h ? ` · ${h} ${h === 1 ? 'hint' : 'hints'}` : '';
+  const mullText = (m) => `${m} ${m === 1 ? 'mulligan' : 'mulligans'}`;
+  const mullTag = (m) => m ? ` · ${mullText(m)}` : '';
   const fmtDiff = (ms) => ms < 100 ? 'under 0.1s' : ms < 60000 ? (ms / 1000).toFixed(1) + 's' : fmtBest(ms);
   // Finished times show tenths, so two runs in the same second still compare
   const fmtBest = (ms) => fmtTime(ms) + '.' + Math.floor((ms % 1000) / 100);
@@ -1522,11 +1533,13 @@ function generateFrom(p, seedBase) {
   }
 
   let countUp = 0;
-  function showScore(pts, high) {
-    const box = $('#winScore'), num = $('#winScoreNum');
+  function showScore(pts, high, mulligans) {
+    const box = $('#winScore'), num = $('#winScoreNum'), cut = $('#winScoreCut');
     cancelAnimationFrame(countUp);
     box.hidden = pts == null;
     $('#winScoreHigh').hidden = !high;
+    cut.hidden = !mulligans;
+    if (mulligans) cut.textContent = `after ${Math.round((1 - Math.pow(MULLIGAN_KEEP, mulligans)) * 100)}% off for ${mullText(mulligans)}`;
     if (pts == null) return;
     if (reduceMotion) { num.textContent = fmtScore(pts); return; }
     const t0 = performance.now(), dur = 700;
@@ -1536,24 +1549,28 @@ function generateFrom(p, seedBase) {
   function showWin() {
     const daily = G.mode === 'daily';
     const streak = $('#winStreak');
-    const pts = boardScore(G.arrows.length, Math.round(G.elapsed), G.diff);
-    const prevPts = G.mode === 'levels' && G.newBest && G.prevBest != null ? boardScore(G.arrows.length, G.prevBest, G.diff) : null;
-    showScore(pts, pts != null && prevPts != null && Math.round(pts * 10) > Math.round(prevPts * 10));
+    const pts = runScore(G.arrows.length, Math.round(G.elapsed), G.diff, G.mulligans);
+    const pr = G.mode === 'levels' ? G.prevRec : null;
+    const prevPts = pr ? runScore(pr.arrows, pr.ms, G.diff, pr.mulligans) : null;
+    showScore(pts, G.newBest && pts != null && prevPts != null && Math.round(pts * 10) > Math.round(prevPts * 10), G.mulligans);
     if (daily) {
       $('#winEyebrow').textContent = `Daily · ${prettyDay(G.day)}`;
       $('#winTitle').textContent = G.replay ? 'Solved again' : 'Daily solved';
       const first = G.replay && S.daily[G.day] ? ` · first solve ${fmtTime(S.daily[G.day].ms)}` : '';
-      $('#winDetail').textContent = `${fmtTime(G.elapsed)} · ${G.arrows.length} arrows · ${missText(G.misses)}${hintText(G.hintsUsed)}${first}`;
+      $('#winDetail').textContent = `${fmtTime(G.elapsed)} · ${G.arrows.length} arrows · ${missText(G.misses)}${hintText(G.hintsUsed)}${mullTag(G.mulligans)}${first}`;
       streak.textContent = streakText(); streak.hidden = false;
       setWinButtons('Back to levels', () => switchMode('levels'), 'See stats', openStats);
     } else {
-      const ms = Math.round(G.elapsed), prev = G.prevBest;
+      const ms = Math.round(G.elapsed), prev = G.prevBest, m = G.mulligans, scored = pts != null;
+      const clean = !m && !(pr && pr.mulligans); // neither run used a mulligan: compare times, as before
       $('#winEyebrow').textContent = `Level ${G.level}` + (G.diff !== 'standard' ? ` · ${cap(G.diff)}` : '');
-      $('#winTitle').textContent = G.newBest && prev != null ? 'New best time' : 'Board clear';
-      $('#winDetail').textContent = `Cleared in ${fmtBest(ms)} · ${G.arrows.length} arrows · ${missText(G.misses)}${hintText(G.hintsUsed)}`;
-      if (prev == null) streak.textContent = 'Your first time on this level. Replay it any time from Stats to beat it.';
-      else if (G.newBest) streak.textContent = `${fmtDiff(prev - ms)} faster than your old best of ${fmtBest(prev)}.`;
-      else streak.textContent = `Your best is still ${fmtBest(prev)}, ${fmtDiff(ms - prev)} faster.`;
+      $('#winTitle').textContent = G.newBest && prev != null ? (clean ? 'New best time' : 'New best') : 'Board clear';
+      $('#winDetail').textContent = `Cleared in ${fmtBest(ms)} · ${G.arrows.length} arrows · ${missText(G.misses)}${hintText(G.hintsUsed)}${mullTag(m)}`;
+      if (prev == null) streak.textContent = m ? 'Cleared with a mulligan. Replay it any time from Stats for a better score.' : 'Your first time on this level. Replay it any time from Stats to beat it.';
+      else if (clean && G.newBest) streak.textContent = `${fmtDiff(prev - ms)} faster than your old best of ${fmtBest(prev)}.`;
+      else if (clean) streak.textContent = `Your best is still ${fmtBest(prev)}, ${fmtDiff(ms - prev)} faster.`;
+      else if (G.newBest) streak.textContent = scored ? `Your best on this level is now ${fmtScore(pts)} points, up from ${fmtScore(prevPts)}.` : 'This run is now your best on this level.';
+      else streak.textContent = scored ? `Your best is still ${fmtScore(prevPts)} points${pr.mulligans ? '' : ` in ${fmtBest(prev)}`}.` : `Your best is still ${fmtBest(prev)}${mullTag(pr.mulligans)}.`;
       streak.hidden = false;
       const furthest = store.get('best', 1), dailyOpen = !S.daily[todayKey()];
       if (G.level + 1 < furthest) setWinButtons(`Back to level ${furthest}`, () => loadLevel(furthest), 'Play it again', restartBoard);
@@ -1565,10 +1582,10 @@ function generateFrom(p, seedBase) {
 
   function showDailyDone() {
     const rec = S.daily[G.day];
-    showScore(boardScore(G.arrows.length, rec.ms, rec.diff || G.diff), false);
+    showScore(runScore(G.arrows.length, rec.ms, rec.diff || G.diff, rec.mulligans || 0), false, rec.mulligans || 0);
     $('#winEyebrow').textContent = `Daily · ${prettyDay(G.day)}`;
     $('#winTitle').textContent = 'Solved today';
-    $('#winDetail').textContent = `${fmtTime(rec.ms)} · ${missText(rec.misses)}. A new board arrives at midnight.`;
+    $('#winDetail').textContent = `${fmtTime(rec.ms)} · ${missText(rec.misses)}${mullTag(rec.mulligans || 0)}. A new board arrives at midnight.`;
     const streak = $('#winStreak'); streak.textContent = streakText(); streak.hidden = false;
     setWinButtons('Back to levels', () => switchMode('levels'), 'Play it again', () => loadBoard({ mode: 'daily', day: G.day, replay: true }));
     $('#winOv').hidden = false;
@@ -1576,8 +1593,23 @@ function generateFrom(p, seedBase) {
 
   function showLose() {
     $('#loseEyebrow').textContent = G.mode === 'daily' ? `Daily · ${prettyDay(G.day)}` : `Level ${G.level}`;
+    const next = G.mulligans + 1, off = Math.round((1 - Math.pow(MULLIGAN_KEEP, next)) * 100);
+    $('#loseText').textContent = SCORE_MULT[G.diff]
+      ? `Take a mulligan to keep this board as it is with three fresh hearts. ${next === 1 ? 'It takes 25% off this run\'s score.' : `This run's score would end up ${off}% lower.`}`
+      : 'Take a mulligan to keep this board as it is with three fresh hearts, or start it over.';
+    $('#mulliganBtn').textContent = next === 1 ? 'Take a mulligan' : 'Take another mulligan';
     $('#loseOv').hidden = false;
-    $('#retryBtn').focus({ preventScroll: true });
+    $('#mulliganBtn').focus({ preventScroll: true });
+  }
+  // Mulligan: the board stays exactly as it is, hearts refill, and the clock carries on
+  function takeMulligan() {
+    if (!G || G.left === 0 || G.hearts > 0) return;
+    G.mulligans++;
+    G.hearts = 3;
+    G.over = false;
+    $('#loseOv').hidden = true;
+    updateHud();
+    timerStart();
   }
 
   // Hints per board: Casual and Relaxed unlimited, Standard 2, Expert 3. Restarting a board refills them.
@@ -1949,6 +1981,7 @@ function generateFrom(p, seedBase) {
   $('#nextBtn').addEventListener('click', () => winAction && winAction());
   $('#winAltBtn').addEventListener('click', () => winAltAction && winAltAction());
   $('#retryBtn').addEventListener('click', restartBoard);
+  $('#mulliganBtn').addEventListener('click', takeMulligan);
   $('#relaxBtn').addEventListener('click', () => { setRelaxed(true); restartBoard(); });
   $('#tabLevels').addEventListener('click', () => switchMode('levels'));
   $('#tabDaily').addEventListener('click', () => switchMode('daily'));
@@ -2092,6 +2125,11 @@ function generateFrom(p, seedBase) {
     return arrows * (10 + 20 * par / (t + par)) * m / 1000;
   }
   // One decimal for a level's score; the total drops the decimal once it reaches 100
+  // Each mulligan keeps 75% of the run's score (25% off, then 25% off what's left)
+  const MULLIGAN_KEEP = 0.75;
+  const runScore = (arrows, ms, d, mulligans) => { const b = boardScore(arrows, ms, d); return b == null ? null : b * Math.pow(MULLIGAN_KEEP, mulligans || 0); };
+  // Ranks runs on any difficulty, Casual included: the same speed curve with the mulligan cut, no difficulty multiplier
+  const rankValue = (arrows, ms, mulligans) => { const t = ms / 1000; return arrows * (10 + 20 * arrows / (t + arrows)) * Math.pow(MULLIGAN_KEEP, mulligans || 0); };
   const fmtScore = (n) => n.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const fmtTotal = (n) => n >= 100 ? Math.round(n).toLocaleString() : fmtScore(n);
   function totalScore(only) {
@@ -2099,7 +2137,7 @@ function generateFrom(p, seedBase) {
     for (const k of Object.keys(S.times)) {
       const [d, lv] = k.split(':');
       if (!SCORE_MULT[d] || (only && d !== only)) continue;
-      const pts = boardScore(arrowCount(+lv, d, S.times[k]), S.times[k].ms, d);
+      const pts = runScore(arrowCount(+lv, d, S.times[k]), S.times[k].ms, d, S.times[k].mulligans);
       if (pts) sum += Math.round(pts * 10) / 10; // add up the values as shown, so the total matches the list
     }
     return Math.round(sum * 10) / 10;
@@ -2118,7 +2156,7 @@ function generateFrom(p, seedBase) {
   let timesSort = (() => { const t = store.get('timesSort', null); return t && SORTS[t.key] && (t.dir === 'asc' || t.dir === 'desc') ? t : { key: 'level', dir: 'asc' }; })();
   // Overall blends all three, fairly across board sizes: seconds per arrow,
   // made 10% worse for each miss and 20% worse for each hint. Lower is better.
-  const overallScore = (r) => (r.ms / 1000 / Math.max(1, r.arrows)) * (1 + 0.1 * r.misses + 0.2 * r.hints);
+  const overallScore = (r) => (r.ms / 1000 / Math.max(1, r.arrows)) * (1 + 0.1 * r.misses + 0.2 * r.hints + 0.3 * (r.mulligans || 0));
   function arrowCount(level, d, rec) {
     if (!rec.arrows) { rec.arrows = generateLevel(level, d).arrows.length; saveStats(); } // older records, counted once
     return rec.arrows;
@@ -2133,7 +2171,7 @@ function generateFrom(p, seedBase) {
     const keys = Object.keys(S.times).filter((k) => k.startsWith(d + ':'));
     const rows = keys.map((k) => {
       const rec = S.times[k], level = +k.split(':')[1];
-      return Object.assign({ level }, rec, { misses: rec.misses || 0, hints: rec.hints || 0 });
+      return Object.assign({ level }, rec, { misses: rec.misses || 0, hints: rec.hints || 0, mulligans: rec.mulligans || 0 });
     });
     const list = $('#timesList'), more = $('#timesMore');
     $('#timesCount').textContent = rows.length ? `${rows.length} ${cap(d)}` : '';
@@ -2147,7 +2185,7 @@ function generateFrom(p, seedBase) {
     const sortState = !scored && timesSort.key === 'score' ? { key: 'level', dir: 'asc' } : timesSort;
     const { key, dir } = sortState, overall = key === 'overall';
     if (overall) for (const r of rows) { r.arrows = arrowCount(r.level, d, S.times[`${d}:${r.level}`]); r.pace = overallScore(r); }
-    if (key === 'score') for (const r of rows) r.pts = boardScore(arrowCount(r.level, d, S.times[`${d}:${r.level}`]), r.ms, d) || 0;
+    if (key === 'score') for (const r of rows) r.pts = runScore(arrowCount(r.level, d, S.times[`${d}:${r.level}`]), r.ms, d, r.mulligans) || 0;
     const cmp = SORTS[key].cmp;
     rows.sort(dir === 'asc' ? cmp : (a, b) => cmp(b, a));
 
@@ -2160,14 +2198,14 @@ function generateFrom(p, seedBase) {
     }
     const pick = SORTS[key], other = pick[dir === 'asc' ? 'desc' : 'asc'];
     $('#sortNote').textContent = `${pick[dir]}. Tap ${key.charAt(0).toUpperCase() + key.slice(1)} again for ${other.charAt(0).toLowerCase() + other.slice(1)}.` +
-      (overall ? ' Overall is your time per arrow, made 10% worse for each miss and 20% worse for each hint, so big and small boards compare fairly.' : '');
+      (overall ? ' Overall is your time per arrow, made 10% worse for each miss, 20% for each hint and 30% for each mulligan, so big and small boards compare fairly.' : '');
 
     const shown = timesAll ? rows : rows.slice(0, TOP_ROWS);
     list.innerHTML = shown.map((r) => {
       const sh = levelParams(r.level, d).shape;
-      const pts = scored ? (r.pts || boardScore(arrowCount(r.level, d, S.times[`${d}:${r.level}`]), r.ms, d)) : null;
+      const pts = scored ? (r.pts || runScore(arrowCount(r.level, d, S.times[`${d}:${r.level}`]), r.ms, d, r.mulligans)) : null;
       const day = r.day ? ` · ${prettyDay(r.day).replace(' ', '\u00a0')}` : ''; // keep the date on one line
-      const sub = `${sh ? sh.name + ' · ' : ''}${missText(r.misses)}${hintText(r.hints)}${r.plays > 1 ? ` · ${r.plays} clears` : ''}${scored ? day : ''}`;
+      const sub = `${sh ? sh.name + ' · ' : ''}${missText(r.misses)}${hintText(r.hints)}${mullTag(r.mulligans)}${r.plays > 1 ? ` · ${r.plays} clears` : ''}${scored ? day : ''}`;
       const small = overall ? `${r.pace.toFixed(2)}s per arrow` : (scored ? `${fmtScore(pts)} pts` : (r.day ? prettyDay(r.day) : ''));
       return `<button type="button" class="time-row" data-level="${r.level}" data-diff="${d}" aria-label="Replay level ${r.level}, best ${fmtBest(r.ms)}${scored ? `, ${fmtScore(pts)} points` : ''}">` +
         `<span><span class="lv">Level ${r.level}</span><span class="sub">${sub}</span></span>` +
@@ -2218,7 +2256,7 @@ function generateFrom(p, seedBase) {
   // ---------- Boot (keeps your place across page updates) ----------
   const hot = window.claude && window.claude.hot;
   if (hot && typeof hot.snapshot === 'function') {
-    hot.snapshot(() => G ? { gen: GEN_VERSION, mode: G.mode, day: G.day, replay: G.replay, diff: G.diff, elapsed: elapsedMs(), level: G.level, removed: G.arrows.filter((a) => a.removed).map((a) => a.id), pending: G.arrows.filter((a) => a.pending && !a.removed).map((a) => a.id), hearts: G.hearts, misses: G.misses, hintsUsed: G.hintsUsed, hintId: G.hintId } : {});
+    hot.snapshot(() => G ? { gen: GEN_VERSION, mode: G.mode, day: G.day, replay: G.replay, diff: G.diff, elapsed: elapsedMs(), level: G.level, removed: G.arrows.filter((a) => a.removed).map((a) => a.id), pending: G.arrows.filter((a) => a.pending && !a.removed).map((a) => a.id), hearts: G.hearts, misses: G.misses, hintsUsed: G.hintsUsed, hintId: G.hintId, mulligans: G.mulligans } : {});
   }
   // A one-time ?level=N link carries progress over from another copy of the game
   try {

@@ -2,6 +2,10 @@
 
 The version shows at the bottom of the Settings screen in the app.
 
+## 1.11.0 · Oct 19, 2026
+- Mulligans: when you run out of hearts, keep the same board exactly as it is with three fresh hearts. The clock carries on, and each mulligan takes 25% off that run's score. Hearts turn amber to show a mulligan is in play
+- A run with a mulligan only replaces your best on a level if its reduced score is still higher. Best times show how many mulligans that run used
+
 ## 1.10.2 · Oct 19, 2026
 - Stats shows a Standard score and an Expert score alongside the overall total
 
