@@ -2,6 +2,12 @@
 
 The version shows at the bottom of the Settings screen in the app.
 
+## 1.12.0 · Oct 19, 2026
+- Best times is now a compact table, one line per level: time, points, misses, hints, mulligans and Overall side by side. Tap a column heading to sort by it, and tap again to reverse
+- Tap a level to see its board, arrow count, clears, the date of your best run and how its score adds up, with a Replay button
+- In level order, levels come in groups of ten that fold away, each showing how many you've cleared and their points
+- How scores work: a short explainer under the score tiles in Stats
+
 ## 1.11.0 · Oct 19, 2026
 - Mulligans: when you run out of hearts, keep the same board exactly as it is with three fresh hearts. The clock carries on, and each mulligan takes 25% off that run's score. Hearts turn amber to show a mulligan is in play
 - A run with a mulligan only replaces your best on a level if its reduced score is still higher. Best times show how many mulligans that run used

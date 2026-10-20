@@ -192,7 +192,6 @@ button{font:inherit;color:inherit}
 .sec-label{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:14px 0 8px}
 .tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .tile.wide{grid-column:1 / -1}
-.tile.wide span.why{margin-top:6px;line-height:1.4}
 .score-line{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:2px 0 2px}
 .score-line b{font-family:var(--font-display);font-weight:400;font-size:40px;line-height:1;font-variant-numeric:tabular-nums;color:var(--ink)}
 .score-line span{font-size:14px;color:var(--muted);font-weight:700}
@@ -216,18 +215,49 @@ button{font:inherit;color:inherit}
 .foot-note{font-size:13px;color:var(--muted);margin-top:12px;line-height:1.45}
 .sec-sub{font-size:13px;color:var(--muted);margin:-4px 0 10px;line-height:1.4}
 .times{display:grid}
-.time-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:12px;width:100%;padding-block:11px;padding-inline:2px;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
-.time-row:active{background:var(--paper)}
-.time-row .lv{display:block;font-weight:700;font-size:15px}
-.time-row .sub{display:block;font-size:12px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
-.time-row .t{font-family:var(--font-display);font-size:22px;line-height:1.1;font-variant-numeric:tabular-nums;text-align:right}
-.time-row .t small{display:block;font-family:var(--font-ui);font-size:11px;color:var(--muted)}
-.time-row svg{width:16px;height:16px;stroke:var(--muted);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-.chip{height:32px;padding-inline:12px;border-radius:999px;border:1.5px solid var(--line);background:transparent;color:var(--muted);font:inherit;font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
-.chip[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
-.chip svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
-.sort-note{font-size:12px;color:var(--muted);margin:8px 0 2px;line-height:1.4}
+/* Best times: a one-line table. Column widths come from --tcols, set by renderTimes for the columns in use */
+.thead,.trow{display:grid;grid-template-columns:var(--tcols);align-items:center;column-gap:4px;width:100%;padding-inline:4px;box-sizing:border-box}
+.thead{position:sticky;top:-18px;z-index:1;background:var(--surface);border-bottom:1.5px solid var(--line);padding-top:4px}
+.th{border:0;background:transparent;color:var(--muted);font:inherit;font-size:11px;font-weight:700;padding:8px 0 6px;cursor:pointer;text-align:right;white-space:nowrap;position:relative}
+.th.c-lv{text-align:left}
+.th[aria-pressed="true"]{color:var(--ink)}
+.th[aria-pressed="true"]::after{content:"";position:absolute;left:0;right:0;bottom:-1.5px;height:2.5px;border-radius:2px;background:var(--ink)}
+.th.c-lv[aria-pressed="true"]::after{right:auto;width:1.9em}
+.trow{border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--ink);font:inherit;font-size:15px;line-height:1.2;text-align:right;padding-block:9px;cursor:pointer;font-variant-numeric:tabular-nums}
+.trow:active,.trow[aria-expanded="true"]{background:var(--paper)}
+.trow[aria-expanded="true"]{border-bottom-color:transparent;border-radius:10px 10px 0 0}
+.trow > span{min-width:0;overflow:hidden;white-space:nowrap}
+.trow .c-lv{text-align:left;font-weight:700}
+.trow .c-t{font-weight:700}
+.trow .c-t small{font-size:12px;font-weight:400;color:var(--muted)}
+.trow .zero{color:var(--muted);opacity:.55}
+.trow .amber{color:var(--tc3);font-weight:700}
+.tdetail{background:var(--paper);border-radius:0 0 10px 10px;padding:2px 10px 10px;margin-bottom:6px;display:grid;gap:6px;font-size:13px;line-height:1.4;color:var(--muted)}
+.tdetail p{margin:0}
+.tdetail b{color:var(--ink)}
+.tdetail .btn{height:40px;margin-top:2px}
+.tgroup{display:flex;align-items:center;gap:8px;width:100%;margin-top:8px;padding:9px 10px;border:0;border-radius:10px;background:var(--paper);color:var(--ink);font:inherit;font-size:14px;font-weight:700;text-align:left;cursor:pointer}
+.tgroup .gsum{margin-left:auto;font-size:12px;font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.tgroup svg{width:14px;height:14px;flex:none;stroke:var(--muted);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;transition:transform .2s}
+.tgroup[aria-expanded="false"] svg{transform:rotate(-90deg)}
+.tgroup + .gbody{margin-top:2px}
+.sort-note{font-size:12px;color:var(--muted);margin:0 0 4px;line-height:1.4}
+/* How scores work */
+.help-toggle{display:inline-flex;align-items:center;gap:6px;margin:8px 0 0;padding:6px 0;border:0;background:transparent;color:var(--accent);font:inherit;font-size:14px;font-weight:700;cursor:pointer;justify-self:start}
+.help-toggle svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;transition:transform .2s}
+.help-toggle[aria-expanded="true"] svg{transform:rotate(180deg)}
+.help{min-width:0;background:var(--paper);border-radius:14px;padding:12px 14px;margin-top:4px;font-size:13px;line-height:1.45;color:var(--muted);display:grid;gap:8px}
+.help p{margin:0}
+.help b{color:var(--ink)}
+.help .formula{color:var(--ink);font-weight:700;font-size:14px}
+.help table{border-collapse:collapse;font-variant-numeric:tabular-nums;width:100%;max-width:320px}
+.help th,.help td{padding:5px 0 5px 10px;text-align:right;font-size:13px;font-weight:400;white-space:nowrap}
+.help th:first-child,.help td:first-child{text-align:left;padding-left:0;width:100%;white-space:normal}
+.help thead th{color:var(--muted);border-bottom:1px solid var(--line)}
+.help td{color:var(--ink);font-weight:700}
+.help td:first-child{color:var(--muted);font-weight:400}
+.help ul{margin:0;padding-left:18px;display:grid;gap:4px}
+@media (prefers-reduced-motion: reduce){ .tgroup svg,.help-toggle svg{transition:none} }
 @media (prefers-reduced-motion: reduce){ .sec-toggle svg{transition:none} }
 .sheet h3{font-family:var(--font-display);font-weight:400;font-size:28px;margin:0 0 4px}
 .row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-block:14px;border-bottom:1px solid var(--line)}
@@ -416,12 +446,30 @@ button{font:inherit;color:inherit}
     <div class="cal" id="cal" aria-label="Dailies solved over the last five weeks"></div>
     <div class="sec-label">Levels</div>
     <div class="tiles" style="margin-bottom:8px">
-      <div class="tile wide"><b id="stScore">0</b><span>Total score: your best on every Standard and Expert level</span>
-        <span class="why">Every 100 arrows on a board are worth 1 to 3 points, about 2 when you clear at one second per arrow. Faster clears earn more, and Expert earns 1.5 times as much.</span></div>
+      <div class="tile wide"><b id="stScore">0</b><span>Total score: your best on every Standard and Expert level</span></div>
       <div class="tile"><b id="stScoreStd">0</b><span>Standard score</span></div>
       <div class="tile"><b id="stScoreExp">0</b><span>Expert score</span></div>
     </div>
-    <div class="tiles">
+    <button type="button" class="help-toggle" id="helpToggle" aria-expanded="false" aria-controls="scoreHelp">How scores work
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+    <div class="help" id="scoreHelp" hidden>
+      <p>A level's score is the size of the board times how fast you cleared it:</p>
+      <p class="formula">points = arrows ÷ 100 × speed rate</p>
+      <p>The speed rate starts at 3 for an instant clear and slides toward 1 the longer each arrow takes. At one second per arrow it's 2.</p>
+      <table>
+        <thead><tr><th>Seconds per arrow</th><th>0.5</th><th>1</th><th>2</th><th>3</th></tr></thead>
+        <tbody><tr><td>Speed rate</td><td>2.33</td><td>2.00</td><td>1.67</td><td>1.50</td></tr></tbody>
+      </table>
+      <ul>
+        <li>Expert scores 1.5 times as much. Casual isn't scored.</li>
+        <li>Each mulligan takes 25% off that run's score.</li>
+        <li>Misses and hints don't change the score. They count toward Overall instead.</li>
+        <li>Bigger boards are worth more, so a small board cleared quickly can score less than a big board cleared slowly. On the same level, a faster clear always scores higher.</li>
+        <li><b>Overall</b> compares your pace on boards of any size: seconds per arrow, plus 10% for each miss, 20% for each hint and 30% for each mulligan. Lower is better.</li>
+      </ul>
+      <p>Tap a level under Best times to see how its score adds up.</p>
+    </div>
+    <div class="tiles" style="margin-top:6px">
       <div class="tile"><b id="stBest">1</b><span>Highest level</span></div>
       <div class="tile"><b id="stCleared">0</b><span>Levels cleared</span></div>
       <div class="tile"><b id="stPerfect">0</b><span>Cleared with no misses</span></div>
@@ -432,23 +480,13 @@ button{font:inherit;color:inherit}
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
     </button>
     <div id="timesBody">
-    <p class="sec-sub">Your fastest clear of each level, with the misses and hints from that run. Tap one to replay it and try to beat it.</p>
-    <div class="seg" id="timesSeg" role="group" aria-label="Difficulty for best times" style="justify-self:start;margin-bottom:4px">
+    <p class="sec-sub">Your best run on each level. Tap a level for its details and to replay it.</p>
+    <div class="seg" id="timesSeg" role="group" aria-label="Difficulty for best times" style="justify-self:start;margin-bottom:8px">
       <button type="button" data-tdiff="casual" aria-pressed="false">Casual</button>
       <button type="button" data-tdiff="standard" aria-pressed="true">Standard</button>
       <button type="button" data-tdiff="expert" aria-pressed="false">Expert</button>
     </div>
-    <div id="sortBox" hidden>
-      <div class="chips" id="sortChips" role="group" aria-label="Sort best times">
-        <button type="button" class="chip" data-sort="level">Level</button>
-        <button type="button" class="chip" data-sort="time">Time</button>
-        <button type="button" class="chip" data-sort="hints">Hints</button>
-        <button type="button" class="chip" data-sort="misses">Misses</button>
-        <button type="button" class="chip" data-sort="score">Score</button>
-        <button type="button" class="chip" data-sort="overall">Overall</button>
-      </div>
-      <p class="sort-note" id="sortNote"></p>
-    </div>
+    <p class="sort-note" id="sortNote" hidden></p>
     <div class="times" id="timesList"></div>
     <button type="button" class="btn quiet more-btn" id="timesMore" hidden>Show all</button>
     </div>
@@ -1046,7 +1084,7 @@ function generateFrom(p, seedBase) {
 <script>
 (() => {
   // Bump with every release so the installed app shows which version it is running
-  const APP_VERSION = '1.11.0';
+  const APP_VERSION = '1.12.0';
   const APP_BUILD = '2026-10-19';
   const $ = (s) => document.querySelector(s);
   {
@@ -2103,14 +2141,13 @@ function generateFrom(p, seedBase) {
     $('#stScoreStd').textContent = fmtTotal(std);
     $('#stScoreExp').textContent = fmtTotal(exp);
     $('#stScore').textContent = fmtTotal(Math.round((std + exp) * 10) / 10);
-    timesAll = false;
+    timesAll = false; timesRow = null;
     renderTimes(diff);
     $('#statsSheet').hidden = false;
     $('#closeStats').focus({ preventScroll: true });
   }
   function closeStats() { $('#statsSheet').hidden = true; timerStart(); }
 
-  const CHEVRON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
 
   // ---------- Score (Standard and Expert; Casual has none) ----------
   // Every 100 arrows are worth 1 point, plus up to 2 more for speed. Par is one second per arrow:
@@ -2145,74 +2182,139 @@ function generateFrom(p, seedBase) {
   // Sort for the best-times list. Every sort starts best-first; tapping it again reverses it.
   // Ties fall back to the other measures, so equal hint counts still come out in a sensible order.
   const SORTS = {
-    level:   { asc: 'Level 1 first', desc: 'Highest level first', cmp: (a, b) => a.level - b.level },
-    time:    { asc: 'Fastest first', desc: 'Slowest first', cmp: (a, b) => a.ms - b.ms || a.misses - b.misses || a.hints - b.hints || a.level - b.level },
-    hints:   { asc: 'Fewest hints first', desc: 'Most hints first', cmp: (a, b) => a.hints - b.hints || a.misses - b.misses || a.ms - b.ms || a.level - b.level },
-    misses:  { asc: 'Fewest misses first', desc: 'Most misses first', cmp: (a, b) => a.misses - b.misses || a.hints - b.hints || a.ms - b.ms || a.level - b.level },
-    score:   { asc: 'Highest score first', desc: 'Lowest score first', cmp: (a, b) => b.pts - a.pts || a.level - b.level },
-    overall: { asc: 'Best overall first', desc: 'Worst overall first', cmp: (a, b) => a.pace - b.pace || a.level - b.level }
+    level:     { asc: 'Level 1 first', desc: 'Highest level first', cmp: (a, b) => a.level - b.level },
+    time:      { asc: 'Fastest first', desc: 'Slowest first', cmp: (a, b) => a.ms - b.ms || a.misses - b.misses || a.hints - b.hints || a.level - b.level },
+    score:     { asc: 'Highest score first', desc: 'Lowest score first', cmp: (a, b) => b.pts - a.pts || a.level - b.level },
+    misses:    { asc: 'Fewest misses first', desc: 'Most misses first', cmp: (a, b) => a.misses - b.misses || a.hints - b.hints || a.ms - b.ms || a.level - b.level },
+    hints:     { asc: 'Fewest hints first', desc: 'Most hints first', cmp: (a, b) => a.hints - b.hints || a.misses - b.misses || a.ms - b.ms || a.level - b.level },
+    mulligans: { asc: 'Fewest mulligans first', desc: 'Most mulligans first', cmp: (a, b) => a.mulligans - b.mulligans || a.pace - b.pace || a.level - b.level },
+    overall:   { asc: 'Best overall first', desc: 'Worst overall first', cmp: (a, b) => a.pace - b.pace || a.level - b.level }
   };
+  // The table's columns, in order. Widths are in px so the heading and every row line up; Time takes what's left.
+  const COLS = [
+    { key: 'level',     label: 'Lvl',     name: 'Level',     cls: 'c-lv', w: '32px' },
+    { key: 'time',      label: 'Time',    name: 'Time',      cls: 'c-t',  w: 'minmax(0,1fr)' },
+    { key: 'score',     label: 'Pts',     name: 'Score',     cls: 'c-n',  w: '34px', scored: true },
+    { key: 'misses',    label: 'Miss',    name: 'Misses',    cls: 'c-n',  w: '28px' },
+    { key: 'hints',     label: 'Hint',    name: 'Hints',     cls: 'c-n',  w: '28px' },
+    { key: 'mulligans', label: 'Mull',    name: 'Mulligans', cls: 'c-n',  w: '28px', mull: true },
+    { key: 'overall',   label: 'Overall', name: 'Overall',   cls: 'c-n',  w: '40px' }
+  ];
+  const fmtPace = (v) => v >= 10 ? v.toFixed(1) : v.toFixed(2);
   let timesDiff = 'standard';
   let timesSort = (() => { const t = store.get('timesSort', null); return t && SORTS[t.key] && (t.dir === 'asc' || t.dir === 'desc') ? t : { key: 'level', dir: 'asc' }; })();
-  // Overall blends all three, fairly across board sizes: seconds per arrow,
-  // made 10% worse for each miss and 20% worse for each hint. Lower is better.
+  let timesShown = timesSort; // the sort actually on screen (Score falls back to Level on Casual)
+  // Overall blends all of it, fairly across board sizes: seconds per arrow, made 10% worse
+  // for each miss, 20% for each hint and 30% for each mulligan. Lower is better.
   const overallScore = (r) => (r.ms / 1000 / Math.max(1, r.arrows)) * (1 + 0.1 * r.misses + 0.2 * r.hints + 0.3 * (r.mulligans || 0));
   function arrowCount(level, d, rec) {
     if (!rec.arrows) { rec.arrows = generateLevel(level, d).arrows.length; saveStats(); } // older records, counted once
     return rec.arrows;
   }
+  const CHEVRON_DOWN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
-  const TOP_ROWS = 10;
-  let timesOpen = store.get('timesOpen', true) !== false, timesAll = false;
+  // What a row shows when tapped: the board, how its score adds up, how Overall is worked out, and Replay
+  function timesDetail(r, d, scored) {
+    const sh = levelParams(r.level, d).shape, n = r.arrows, spa = r.ms / 1000 / Math.max(1, n);
+    const facts = [sh && sh.name, `${n} arrows`, r.plays > 1 ? `cleared ${r.plays} times` : 'cleared once', r.day && `best run ${prettyDay(r.day).replace(' ', '\u00a0')}`].filter(Boolean);
+    let html = `<p>${facts.join(' · ')}</p>`;
+    if (scored) {
+      const rate = 1 + 2 / (1 + spa), cut = r.mulligans ? Math.round((1 - Math.pow(MULLIGAN_KEEP, r.mulligans)) * 100) : 0;
+      html += `<p><b>${fmtScore(r.pts)} points</b> = ${n} arrows ÷ 100 × ${rate.toFixed(2)} speed rate at ${spa.toFixed(2)} seconds per arrow` +
+        `${d === 'expert' ? ' × 1.5 for Expert' : ''}${cut ? `, then ${cut}% off for ${mullText(r.mulligans)}` : ''}</p>`;
+    }
+    const extra = [r.misses && `${r.misses * 10}% for ${missText(r.misses)}`, r.hints && `${r.hints * 20}% for ${plural(r.hints, 'hint', 'hints')}`,
+      r.mulligans && `${r.mulligans * 30}% for ${mullText(r.mulligans)}`].filter(Boolean);
+    html += `<p><b>Overall ${fmtPace(r.pace)}</b> = ${spa.toFixed(2)} seconds per arrow${extra.length ? ' + ' + extra.join(' + ') : ', with no misses or hints'}</p>`;
+    return html + `<button type="button" class="btn primary replay" data-level="${r.level}">Replay level ${r.level}</button>`;
+  }
+
+  const TOP_ROWS = 10, GROUP = 10;
+  const groupOf = (level) => Math.floor((level - 1) / GROUP);
+  let timesOpen = store.get('timesOpen', true) !== false, timesAll = false, timesRow = null;
+  // Which groups of ten are open, per difficulty. Until you choose, the group with your highest level opens.
+  let timesGroups = store.get('timesGroups', {});
+  if (!timesGroups || typeof timesGroups !== 'object') timesGroups = {};
   function renderTimes(d) {
     timesDiff = d;
     for (const b of document.querySelectorAll('#timesSeg button')) b.setAttribute('aria-pressed', String(b.dataset.tdiff === d));
     const scored = !!SCORE_MULT[d];
-    const keys = Object.keys(S.times).filter((k) => k.startsWith(d + ':'));
-    const rows = keys.map((k) => {
+    const rows = Object.keys(S.times).filter((k) => k.startsWith(d + ':')).map((k) => {
       const rec = S.times[k], level = +k.split(':')[1];
-      return Object.assign({ level }, rec, { misses: rec.misses || 0, hints: rec.hints || 0, mulligans: rec.mulligans || 0 });
+      const r = Object.assign({ level }, rec, { misses: rec.misses || 0, hints: rec.hints || 0, mulligans: rec.mulligans || 0, arrows: arrowCount(level, d, rec) });
+      r.pace = overallScore(r);
+      r.pts = scored ? runScore(r.arrows, r.ms, d, r.mulligans) || 0 : null;
+      return r;
     });
-    const list = $('#timesList'), more = $('#timesMore');
+    const list = $('#timesList'), more = $('#timesMore'), note = $('#sortNote');
     $('#timesCount').textContent = rows.length ? `${rows.length} ${cap(d)}` : '';
     $('#timesToggle').setAttribute('aria-expanded', String(timesOpen));
     $('#timesBody').hidden = !timesOpen;
-    $('#sortBox').hidden = rows.length < 2;
-    $('#sortChips [data-sort="score"]').hidden = !scored;
-    if (!rows.length) { list.innerHTML = `<p class="foot-note">No ${cap(d)} times yet. Clear a level and its time shows up here.</p>`; more.hidden = true; return; }
-
-    // Score sort doesn't exist on Casual: fall back to level order there without forgetting the choice
-    const sortState = !scored && timesSort.key === 'score' ? { key: 'level', dir: 'asc' } : timesSort;
-    const { key, dir } = sortState, overall = key === 'overall';
-    if (overall) for (const r of rows) { r.arrows = arrowCount(r.level, d, S.times[`${d}:${r.level}`]); r.pace = overallScore(r); }
-    if (key === 'score') for (const r of rows) r.pts = runScore(arrowCount(r.level, d, S.times[`${d}:${r.level}`]), r.ms, d, r.mulligans) || 0;
-    const cmp = SORTS[key].cmp;
-    rows.sort(dir === 'asc' ? cmp : (a, b) => cmp(b, a));
-
-    for (const c of document.querySelectorAll('#sortChips .chip')) {
-      const on = c.dataset.sort === key;
-      c.setAttribute('aria-pressed', String(on));
-      const name = c.dataset.sort.charAt(0).toUpperCase() + c.dataset.sort.slice(1);
-      c.innerHTML = on ? `${name}<svg viewBox="0 0 24 24" aria-hidden="true">${dir === 'asc' ? '<path d="M12 19V5"/><path d="M6 11l6-6 6 6"/>' : '<path d="M12 5v14"/><path d="M6 13l6 6 6-6"/>'}</svg>` : name;
-      c.setAttribute('aria-label', on ? `${name}, ${SORTS[key][dir]}. Tap to reverse.` : `Sort by ${name.toLowerCase()}`);
+    if (!rows.length) {
+      list.innerHTML = `<p class="foot-note">No ${cap(d)} times yet. Clear a level and its time shows up here.</p>`;
+      more.hidden = note.hidden = true; return;
     }
-    const pick = SORTS[key], other = pick[dir === 'asc' ? 'desc' : 'asc'];
-    $('#sortNote').textContent = `${pick[dir]}. Tap ${key.charAt(0).toUpperCase() + key.slice(1)} again for ${other.charAt(0).toLowerCase() + other.slice(1)}.` +
-      (overall ? ' Overall is your time per arrow, made 10% worse for each miss, 20% for each hint and 30% for each mulligan, so big and small boards compare fairly.' : '');
 
-    const shown = timesAll ? rows : rows.slice(0, TOP_ROWS);
-    list.innerHTML = shown.map((r) => {
-      const sh = levelParams(r.level, d).shape;
-      const pts = scored ? (r.pts || runScore(arrowCount(r.level, d, S.times[`${d}:${r.level}`]), r.ms, d, r.mulligans)) : null;
-      const day = r.day ? ` · ${prettyDay(r.day).replace(' ', '\u00a0')}` : ''; // keep the date on one line
-      const sub = `${sh ? sh.name + ' · ' : ''}${missText(r.misses)}${hintText(r.hints)}${mullTag(r.mulligans)}${r.plays > 1 ? ` · ${r.plays} clears` : ''}${scored ? day : ''}`;
-      const small = overall ? `${r.pace.toFixed(2)}s per arrow` : (scored ? `${fmtScore(pts)} pts` : (r.day ? prettyDay(r.day) : ''));
-      return `<button type="button" class="time-row" data-level="${r.level}" data-diff="${d}" aria-label="Replay level ${r.level}, best ${fmtBest(r.ms)}${scored ? `, ${fmtScore(pts)} points` : ''}">` +
-        `<span><span class="lv">Level ${r.level}</span><span class="sub">${sub}</span></span>` +
-        `<span class="t">${fmtBest(r.ms)}<small>${small}</small></span>${CHEVRON}</button>`;
-    }).join('');
-    more.hidden = rows.length <= TOP_ROWS;
-    more.textContent = timesAll ? 'Show fewer' : `Show all ${rows.length} levels`;
+    // Pts only on scored difficulties, Mull only once a mulligan has been used. A sort whose
+    // column isn't showing falls back to level order without forgetting the choice.
+    const hasMull = rows.some((r) => r.mulligans > 0);
+    const cols = COLS.filter((c) => (!c.scored || scored) && (!c.mull || hasMull));
+    timesShown = cols.some((c) => c.key === timesSort.key) ? timesSort : { key: 'level', dir: 'asc' };
+    const { key, dir } = timesShown, pick = SORTS[key], cmp = pick.cmp;
+    rows.sort(dir === 'asc' ? cmp : (a, b) => cmp(b, a));
+    note.hidden = rows.length < 2;
+    note.textContent = `${pick[dir]}. Tap a heading to sort by it, and again to reverse.`;
+
+    const head = '<div class="thead" role="group" aria-label="Sort best times">' + cols.map((c) => {
+      const on = c.key === key;
+      return `<button type="button" class="th ${c.cls}" data-sort="${c.key}" aria-pressed="${on}" ` +
+        `aria-label="${on ? `${c.name}, ${pick[dir].toLowerCase()}. Tap to reverse.` : `Sort by ${c.name.toLowerCase()}`}">${c.label}</button>`;
+    }).join('') + '</div>';
+    const cell = (c, r) => {
+      if (c.key === 'level') return `<span class="c-lv">${r.level}</span>`;
+      if (c.key === 'time') { // tenths only matter under an hour, and dropping them keeps long times in the column
+        if (r.ms >= 3600000) return `<span class="c-t">${fmtTime(r.ms)}</span>`;
+        const t = fmtBest(r.ms), i = t.lastIndexOf('.'); return `<span class="c-t">${t.slice(0, i)}<small>${t.slice(i)}</small></span>`;
+      }
+      if (c.key === 'score') return `<span>${fmtScore(r.pts)}</span>`;
+      if (c.key === 'overall') return `<span>${fmtPace(r.pace)}</span>`;
+      const v = r[c.key];
+      return `<span class="${!v ? 'zero' : c.key === 'mulligans' ? 'amber' : ''}">${v}</span>`;
+    };
+    const rowHtml = (r) => {
+      const id = `td-${d}-${r.level}`, open = timesRow === `${d}:${r.level}`;
+      const label = [`Level ${r.level}`, fmtBest(r.ms), scored && `${fmtScore(r.pts)} points`, missText(r.misses), r.hints ? plural(r.hints, 'hint', 'hints') : 'no hints',
+        r.mulligans && mullText(r.mulligans), `overall ${fmtPace(r.pace)}`].filter(Boolean).join(', ');
+      return `<button type="button" class="trow" data-level="${r.level}" aria-expanded="${open}" aria-controls="${id}" aria-label="${label}">${cols.map((c) => cell(c, r)).join('')}</button>` +
+        `<div class="tdetail" id="${id}"${open ? '' : ' hidden'}>${timesDetail(r, d, scored)}</div>`;
+    };
+
+    let body;
+    if (key === 'level' && new Set(rows.map((r) => groupOf(r.level))).size > 1) {
+      // Level order comes in groups of ten that fold away, each with its own count and points
+      const saved = timesGroups[d], openSet = new Set(Array.isArray(saved) ? saved : [groupOf(Math.max(...rows.map((r) => r.level)))]);
+      const groups = [];
+      for (const r of rows) {
+        const g = groupOf(r.level);
+        if (!groups.length || groups[groups.length - 1].g !== g) groups.push({ g, rows: [] });
+        groups[groups.length - 1].rows.push(r);
+      }
+      body = groups.map(({ g, rows: gr }) => {
+        const open = openSet.has(g), lo = g * GROUP + 1, hi = lo + GROUP - 1;
+        const pts = scored ? Math.round(gr.reduce((s, r) => s + Math.round(r.pts * 10) / 10, 0) * 10) / 10 : 0;
+        return `<button type="button" class="tgroup" data-group="${g}" aria-expanded="${open}" aria-controls="tg-${d}-${g}">Levels ${lo}–${hi}` +
+          `<span class="gsum">${gr.length} cleared${scored ? ` · ${fmtScore(pts)} pts` : ''}</span>${CHEVRON_DOWN}</button>` +
+          `<div class="gbody" id="tg-${d}-${g}"${open ? '' : ' hidden'}>${gr.map(rowHtml).join('')}</div>`;
+      }).join('');
+      more.hidden = true;
+    } else {
+      body = (timesAll ? rows : rows.slice(0, TOP_ROWS)).map(rowHtml).join('');
+      more.hidden = rows.length <= TOP_ROWS;
+      more.textContent = timesAll ? 'Show fewer' : `Show all ${rows.length} levels`;
+    }
+    list.style.setProperty('--tcols', cols.map((c) => c.w).join(' '));
+    list.innerHTML = head + body;
   }
   $('#timesToggle').addEventListener('click', () => {
     timesOpen = !timesOpen; store.set('timesOpen', timesOpen);
@@ -2222,22 +2324,51 @@ function generateFrom(p, seedBase) {
     const wasAll = timesAll; timesAll = !timesAll; renderTimes(timesDiff);
     if (wasAll) $('#timesToggle').scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' });
   });
-  $('#sortChips').addEventListener('click', (e) => {
-    const c = e.target.closest('.chip');
-    if (!c) return;
-    const k = c.dataset.sort;
-    timesSort = k === timesSort.key ? { key: k, dir: timesSort.dir === 'asc' ? 'desc' : 'asc' } : { key: k, dir: 'asc' };
-    store.set('timesSort', timesSort);
-    renderTimes(timesDiff);
+  $('#helpToggle').addEventListener('click', () => {
+    const open = $('#helpToggle').getAttribute('aria-expanded') !== 'true';
+    $('#helpToggle').setAttribute('aria-expanded', String(open));
+    $('#scoreHelp').hidden = !open;
   });
   for (const b of document.querySelectorAll('#timesSeg button')) b.addEventListener('click', () => renderTimes(b.dataset.tdiff));
-  $('#timesList').addEventListener('click', (e) => {
-    const row = e.target.closest('.time-row');
-    if (!row) return;
-    const level = +row.dataset.level, d = row.dataset.diff;
+  function replayLevel(level, d) {
     $('#statsSheet').hidden = true;
     if (d !== diff && DIFFICULTIES.includes(d)) { diff = d; store.set('difficulty', d); stash.levels = stash.daily = null; syncDiff(); }
     switchMode('levels', level);
+  }
+  $('#timesList').addEventListener('click', (e) => {
+    const th = e.target.closest('.th');
+    if (th) {
+      const k = th.dataset.sort;
+      timesSort = k === timesShown.key ? { key: k, dir: timesShown.dir === 'asc' ? 'desc' : 'asc' } : { key: k, dir: 'asc' };
+      store.set('timesSort', timesSort);
+      renderTimes(timesDiff);
+      return;
+    }
+    const g = e.target.closest('.tgroup');
+    if (g) {
+      const open = g.getAttribute('aria-expanded') !== 'true';
+      g.setAttribute('aria-expanded', String(open));
+      document.getElementById(g.getAttribute('aria-controls')).hidden = !open;
+      timesGroups[timesDiff] = [...document.querySelectorAll('#timesList .tgroup[aria-expanded="true"]')].map((x) => +x.dataset.group);
+      store.set('timesGroups', timesGroups);
+      return;
+    }
+    const rp = e.target.closest('.replay');
+    if (rp) { replayLevel(+rp.dataset.level, timesDiff); return; }
+    const row = e.target.closest('.trow');
+    if (!row) return;
+    // One row open at a time; tapping the open row folds it again
+    const k = `${timesDiff}:${row.dataset.level}`, open = timesRow !== k;
+    for (const x of document.querySelectorAll('#timesList .trow[aria-expanded="true"]')) {
+      x.setAttribute('aria-expanded', 'false'); document.getElementById(x.getAttribute('aria-controls')).hidden = true;
+    }
+    timesRow = open ? k : null;
+    if (open) {
+      row.setAttribute('aria-expanded', 'true');
+      const det = document.getElementById(row.getAttribute('aria-controls'));
+      det.hidden = false;
+      det.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
+    }
   });
   $('#statsBtn').addEventListener('click', openStats);
   $('#closeStats').addEventListener('click', closeStats);
