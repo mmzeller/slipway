@@ -2,6 +2,10 @@
 
 The version shows at the bottom of the Settings screen in the app.
 
+## 1.13.0 · Oct 20, 2026
+- Back up progress: Settings can save your levels, best times, scores, streaks and settings to a file, and Restore brings them back. Use it before removing the app from your home screen, which erases its saved progress
+- Restoring merges with what's already here instead of overwriting it: on each level the better run wins, and dailies from both are kept
+
 ## 1.12.0 · Oct 19, 2026
 - Best times is now a compact table, one line per level: time, points, misses, hints, mulligans and Overall side by side. Tap a column heading to sort by it, and tap again to reverse
 - Tap a level to see its board, arrow count, clears, the date of your best run and how its score adds up, with a Replay button

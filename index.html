@@ -273,6 +273,13 @@ button{font:inherit;color:inherit}
 .stepper button:disabled{opacity:.35;cursor:default}
 .stepper input{width:72px;height:40px;text-align:center;font-family:var(--font-display);font-size:22px;font-variant-numeric:tabular-nums;border:1.5px solid var(--line);border-radius:12px;background:var(--paper);color:var(--ink);-webkit-user-select:text;user-select:text;padding:0}
 .sheet-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.file-pick{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none}
+label.btn{-webkit-user-select:none;user-select:none}
+.restore-box{background:var(--paper);border-radius:14px;padding:12px 14px;margin-top:12px;display:grid;gap:2px}
+.restore-box p{margin:0}
+.restore-box .sheet-actions{margin-top:10px}
+.backup-status{font-size:13px;color:var(--muted);margin:10px 0 0;line-height:1.4}
+.backup-status.bad{color:var(--danger)}
 .danger-text{color:var(--danger)}
 .version{margin:2px 0 0;text-align:center;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;-webkit-user-select:text;user-select:text}
 
@@ -428,6 +435,26 @@ button{font:inherit;color:inherit}
       <button class="btn" id="resetBtn" type="button"><span class="danger-text" id="resetLabel">Back to level 1</span></button>
       <button class="btn primary" id="playLvBtn" type="button">Play level 1</button>
     </div>
+    <div class="row" style="margin-top:6px">
+      <div class="row-text">
+        <div class="row-title">Back up progress</div>
+        <div class="row-sub" id="backupSub">Saves your levels, best times, scores, streaks and settings to a file. Choose Save to Files, then use Restore after reinstalling or on another device.</div>
+      </div>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn" id="backupBtn" type="button">Back up</button>
+      <label class="btn" id="restoreBtn" for="restoreFile">Restore</label>
+    </div>
+    <input class="file-pick" type="file" id="restoreFile" tabindex="-1" aria-hidden="true">
+    <div class="restore-box" id="restoreBox" hidden>
+      <p class="row-title" id="restoreTitle">Restore this backup?</p>
+      <p class="row-sub" id="restoreText"></p>
+      <div class="sheet-actions">
+        <button class="btn" id="restoreCancel" type="button">Cancel</button>
+        <button class="btn primary" id="restoreGo" type="button">Restore</button>
+      </div>
+    </div>
+    <p class="backup-status" id="backupStatus" role="status" hidden></p>
     <button class="btn quiet" id="closeSheet" type="button">Close</button>
     <p class="version" id="versionText"></p>
   </div>
@@ -1084,8 +1111,8 @@ function generateFrom(p, seedBase) {
 <script>
 (() => {
   // Bump with every release so the installed app shows which version it is running
-  const APP_VERSION = '1.12.0';
-  const APP_BUILD = '2026-10-19';
+  const APP_VERSION = '1.13.0';
+  const APP_BUILD = '2026-10-20';
   const $ = (s) => document.querySelector(s);
   {
     const [y, m, d] = APP_BUILD.split('-').map(Number);
@@ -2061,6 +2088,7 @@ function generateFrom(p, seedBase) {
     $('#carefulSw').setAttribute('aria-pressed', String(settings.careful));
     disarmReset();
     syncStepper();
+    syncBackupSub(); backupStatus(''); $('#restoreBox').hidden = true; pendingRestore = null;
     $('#sheet').hidden = false;
     $('#closeSheet').focus({ preventScroll: true });
   }
@@ -2108,6 +2136,120 @@ function generateFrom(p, seedBase) {
     closeSheet();
     switchMode('levels', 1);
   });
+
+  // ---------- Back up and restore ----------
+  // A home-screen app keeps its own storage, and removing it from the home screen erases that storage,
+  // so progress can be saved to a file and brought back here or on another device.
+  const BACKUP_KEYS = ['level', 'best', 'difficulty', 'relaxed', 'sound', 'careful', 'stats', 'timesSort', 'timesOpen', 'timesGroups', 'zoomTipDone', 'unclearTips'];
+  const longDay = (d) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  function backupStatus(msg, bad) { const el = $('#backupStatus'); el.textContent = msg; el.hidden = !msg; el.classList.toggle('bad', !!bad); }
+  function syncBackupSub() {
+    const last = store.get('lastBackup', null);
+    $('#backupSub').textContent = 'Saves your levels, best times, scores, streaks and settings to a file. Choose Save to Files, then use Restore after reinstalling or on another device.' +
+      (last ? ` Last backup ${longDay(new Date(last))}.` : '');
+  }
+  function backupPayload() {
+    saveStats();
+    const data = {};
+    for (const k of BACKUP_KEYS) { const v = store.get(k, undefined); if (v !== undefined) data[k] = v; }
+    return { app: 'Slipway', kind: 'backup', format: 1, version: APP_VERSION, created: new Date().toISOString(), data };
+  }
+  async function makeBackup() {
+    const name = `slipway-backup-${todayKey()}.json`, text = JSON.stringify(backupPayload(), null, 1);
+    const done = () => { store.set('lastBackup', Date.now()); syncBackupSub(); };
+    let file = null;
+    try { file = new File([text], name, { type: 'application/json' }); } catch (e) {}
+    if (file && navigator.canShare && navigator.share) {
+      let shareable = false;
+      try { shareable = navigator.canShare({ files: [file] }); } catch (e) {}
+      if (shareable) {
+        try { await navigator.share({ files: [file], title: 'Slipway backup' }); done(); backupStatus(`Backup saved: ${name}`); return; }
+        catch (e) { if (e && e.name === 'AbortError') { backupStatus('Backup cancelled. Nothing was saved.'); return; } }
+      }
+    }
+    try { // no share sheet here: download the file instead
+      const url = URL.createObjectURL(file || new Blob([text], { type: 'application/json' }));
+      const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      done(); backupStatus(`Backup downloaded: ${name}`);
+    } catch (e) { backupStatus("This browser couldn't save the file.", true); }
+  }
+
+  // Merging rather than overwriting: anything played here since the backup is kept, and the better run on each level wins
+  function betterRun(key, a, b) { // b is the backup's run; ties go to the backup
+    const [d, lv] = key.split(':');
+    let n = a.arrows || b.arrows;
+    if (!n) { try { n = generateLevel(+lv, d).arrows.length; } catch (e) { n = 100; } }
+    const win = rankValue(n, b.ms, b.mulligans) >= rankValue(n, a.ms, a.mulligans) ? b : a;
+    return Object.assign({}, win, { arrows: n, plays: Math.max(a.plays || 1, b.plays || 1) });
+  }
+  function mergeStats(cur, bak) {
+    if (!cur || typeof cur !== 'object') return bak;
+    if (!bak || typeof bak !== 'object') return cur;
+    const out = Object.assign({}, cur, bak);
+    for (const k of ['cleared', 'perfect', 'arrows', 'playMs', 'bestStreak']) out[k] = Math.max(+cur[k] || 0, +bak[k] || 0);
+    out.expertV2 = true;
+    out.times = Object.assign({}, cur.times);
+    for (const [k, b] of Object.entries(bak.times || {})) out.times[k] = out.times[k] ? betterRun(k, out.times[k], b) : b;
+    out.daily = Object.assign({}, cur.daily);
+    for (const [k, b] of Object.entries(bak.daily || {})) { const c = out.daily[k]; out.daily[k] = c && (c.ms || Infinity) < (b.ms || Infinity) ? c : b; }
+    if (cur.archivedTimes || bak.archivedTimes) out.archivedTimes = Object.assign({}, cur.archivedTimes, bak.archivedTimes);
+    return out;
+  }
+  let pendingRestore = null;
+  function readBackup(text) {
+    let p = null;
+    try { p = JSON.parse(text); } catch (e) {}
+    if (!p || p.app !== 'Slipway' || p.kind !== 'backup' || !p.data || typeof p.data !== 'object') return null;
+    const data = {};
+    for (const k of BACKUP_KEYS) if (k in p.data) data[k] = p.data[k];
+    if (data.stats && (typeof data.stats !== 'object' || typeof data.stats.times !== 'object')) return null;
+    return Object.assign({}, p, { data });
+  }
+  $('#restoreFile').addEventListener('change', async () => {
+    const f = $('#restoreFile').files && $('#restoreFile').files[0];
+    $('#restoreFile').value = '';
+    if (!f) return;
+    let text = '';
+    try { text = await f.text(); } catch (e) {}
+    const p = text && text.length < 5e6 ? readBackup(text) : null;
+    if (!p) { pendingRestore = null; $('#restoreBox').hidden = true; backupStatus("That file isn't a Slipway backup, so nothing changed.", true); return; }
+    const st = p.data.stats || {}, times = Object.keys(st.times || {}).length, dailies = Object.keys(st.daily || {}).length;
+    const made = p.created && !isNaN(new Date(p.created)) ? longDay(new Date(p.created)) : 'an earlier day';
+    $('#restoreTitle').textContent = `Restore the backup from ${made}?`;
+    $('#restoreText').textContent = `Furthest level ${p.data.best || 1} · ${times} best ${times === 1 ? 'time' : 'times'} · ${dailies} ${dailies === 1 ? 'daily' : 'dailies'} solved. ` +
+      'Anything you\'ve played here is kept too: on each level, the better run wins.';
+    pendingRestore = p; backupStatus('');
+    $('#restoreBox').hidden = false;
+    $('#restoreBox').scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
+  });
+  $('#restoreCancel').addEventListener('click', () => { pendingRestore = null; $('#restoreBox').hidden = true; backupStatus('Restore cancelled. Nothing changed.'); });
+  $('#restoreGo').addEventListener('click', () => {
+    if (!pendingRestore) return;
+    const bak = pendingRestore.data; pendingRestore = null;
+    timerStop(); saveStats();
+    const cur = {}; for (const k of BACKUP_KEYS) cur[k] = store.get(k, undefined);
+    const out = Object.assign({}, cur);
+    for (const k of BACKUP_KEYS) if (k in bak) out[k] = bak[k]; // settings come back as they were
+    out.best = Math.max(+cur.best || 1, +bak.best || 1);
+    out.level = Math.max(+cur.level || 1, +bak.level || 1);
+    out.stats = mergeStats(cur.stats, bak.stats);
+    for (const k of BACKUP_KEYS) if (out[k] !== undefined) store.set(k, out[k]);
+    // Apply it to the running game too. (Reloading instead can lose writes made just before it in some browsers.)
+    for (const k of Object.keys(S)) delete S[k];
+    Object.assign(S, { cleared: 0, perfect: 0, arrows: 0, playMs: 0, bestStreak: 0, daily: {}, times: {} }, out.stats);
+    settings.relaxed = !!out.relaxed; settings.sound = out.sound !== false; settings.careful = out.careful !== false;
+    if (DIFFICULTIES.includes(out.difficulty)) diff = out.difficulty;
+    const ts = out.timesSort; timesSort = ts && SORTS[ts.key] && (ts.dir === 'asc' || ts.dir === 'desc') ? ts : { key: 'level', dir: 'asc' };
+    timesOpen = out.timesOpen !== false;
+    timesGroups = out.timesGroups && typeof out.timesGroups === 'object' ? out.timesGroups : {};
+    syncDiff();
+    $('#sheet').hidden = true; disarmReset();
+    stash.levels = stash.daily = null; G = null;
+    loadLevel(store.get('level', 1));
+    toast('Backup restored');
+  });
+  $('#backupBtn').addEventListener('click', makeBackup);
 
   // ---------- Stats sheet ----------
   function openStats() {
